@@ -1,11 +1,13 @@
 package parser
 
+import "iter"
+
 /*
 The Peg-grammar parser. Bootstrap.Parse() returns a *Grammar.
 */
-var Bootstrap = bootstrap()
+var Bootstrap = NewParser[*Grammar]("Grammar", PegGrammar, PegHandler)
 
-func bootstrap() *Parser {
+var PegGrammar = func() *Grammar {
 	peg := NewGrammar()
 	peg.AddRule("Grammar", Seq(Ref("Line"), Rep(Seq(Ref("EOL"), Ref("Line"))), Opt(Ref("EOL")), Ref("EOF")))
 	peg.AddRule("Line", Alt(Ref("Rule"), Ref("Comment"), Ref("WS")))
@@ -34,15 +36,15 @@ func bootstrap() *Parser {
 	peg.AddRule("WS", Rep(Cls("[ \\t]")))
 	peg.AddRule("EOL", Cls("[\\n\\r]"))
 	peg.AddRule("EOF", Not(Dot()))
-	return NewParser("Grammar", PegHandler, peg)
-}
+	return peg
+}()
 
 var PegHandler = WrapHandler(pegHandler{})
 
 type pegHandler struct{}
 
-func (p pegHandler) Grammar(result *ParseResult) (any, error) {
-	rules := Cast[*Rule](Filter(ListOf(result.Results(), "Line"), func(r any) bool { return r != nil }))
+func (p pegHandler) Grammar(result iter.Seq2[string, any]) (any, error) {
+	rules := Cast[*Rule](Filter(ListOf(result, "Line"), func(r any) bool { return r != nil }))
 	grammar := NewGrammar()
 	for _, rule := range rules {
 		grammar.Add(rule)
@@ -50,87 +52,87 @@ func (p pegHandler) Grammar(result *ParseResult) (any, error) {
 	return grammar, nil
 }
 
-func (p pegHandler) Line(result *ParseResult) (any, error) {
-	_, rule := FirstOf(result.Results(), "Rule")
+func (p pegHandler) Line(result iter.Seq2[string, any]) (any, error) {
+	_, rule := FirstOf(result, "Rule")
 	return rule, nil
 }
 
-func (p pegHandler) Rule(result *ParseResult) (any, error) {
-	_, name := FirstOf(result.Results(), "Name")
-	_, expr := FirstOf(result.Results(), "Expr")
+func (p pegHandler) Rule(result iter.Seq2[string, any]) (any, error) {
+	_, name := FirstOf(result, "Name")
+	_, expr := FirstOf(result, "Expr")
 	return NewRule(name.(string), expr.(Expr)), nil
 }
 
-func (p pegHandler) Expr(result *ParseResult) (any, error) {
-	seqs := Cast[Expr](ListOf(result.Results(), "Seq"))
+func (p pegHandler) Expr(result iter.Seq2[string, any]) (any, error) {
+	seqs := Cast[Expr](ListOf(result, "Seq"))
 	return Alt(seqs...), nil
 }
 
-func (p pegHandler) Seq(result *ParseResult) (any, error) {
-	prefixs := Cast[Expr](ListOf(result.Results(), "Prefix"))
+func (p pegHandler) Seq(result iter.Seq2[string, any]) (any, error) {
+	prefixs := Cast[Expr](ListOf(result, "Prefix"))
 	return Seq(prefixs...), nil
 }
 
-func (p pegHandler) Prefix(result *ParseResult) (any, error) {
-	_, value := FirstOf(result.Results(), "AndExpr", "NotExpr", "Suffix")
+func (p pegHandler) Prefix(result iter.Seq2[string, any]) (any, error) {
+	_, value := FirstOf(result, "AndExpr", "NotExpr", "Suffix")
 	return value, nil
 }
 
-func (p pegHandler) AndExpr(result *ParseResult) (any, error) {
-	_, expr := FirstOf(result.Results(), "Suffix")
+func (p pegHandler) AndExpr(result iter.Seq2[string, any]) (any, error) {
+	_, expr := FirstOf(result, "Suffix")
 	return See(expr.(Expr)), nil
 }
 
-func (p pegHandler) NotExpr(result *ParseResult) (any, error) {
-	_, expr := FirstOf(result.Results(), "Suffix")
+func (p pegHandler) NotExpr(result iter.Seq2[string, any]) (any, error) {
+	_, expr := FirstOf(result, "Suffix")
 	return Not(expr.(Expr)), nil
 }
 
-func (p pegHandler) Suffix(result *ParseResult) (any, error) {
-	_, value := FirstOf(result.Results(), "OptExpr", "RepExpr", "ReqExpr", "Primary")
+func (p pegHandler) Suffix(result iter.Seq2[string, any]) (any, error) {
+	_, value := FirstOf(result, "OptExpr", "RepExpr", "ReqExpr", "Primary")
 	return value, nil
 }
 
-func (p pegHandler) OptExpr(result *ParseResult) (any, error) {
-	_, expr := FirstOf(result.Results(), "Primary")
+func (p pegHandler) OptExpr(result iter.Seq2[string, any]) (any, error) {
+	_, expr := FirstOf(result, "Primary")
 	return Opt(expr.(Expr)), nil
 }
 
-func (p pegHandler) RepExpr(result *ParseResult) (any, error) {
-	_, expr := FirstOf(result.Results(), "Primary")
+func (p pegHandler) RepExpr(result iter.Seq2[string, any]) (any, error) {
+	_, expr := FirstOf(result, "Primary")
 	return Rep(expr.(Expr)), nil
 }
 
-func (p pegHandler) ReqExpr(result *ParseResult) (any, error) {
-	_, expr := FirstOf(result.Results(), "Primary")
+func (p pegHandler) ReqExpr(result iter.Seq2[string, any]) (any, error) {
+	_, expr := FirstOf(result, "Primary")
 	return Req(expr.(Expr)), nil
 }
 
-func (p pegHandler) Primary(result *ParseResult) (any, error) {
-	_, value := FirstOf(result.Results(), "Dot", "ParExpr", "Literal", "CharClass", "Ref")
+func (p pegHandler) Primary(result iter.Seq2[string, any]) (any, error) {
+	_, value := FirstOf(result, "Dot", "ParExpr", "Literal", "CharClass", "Ref")
 	return value, nil
 }
 
-func (p pegHandler) Dot(result *ParseResult) (any, error) {
+func (p pegHandler) Dot(result iter.Seq2[string, any]) (any, error) {
 	return Dot(), nil
 }
 
-func (p pegHandler) ParExpr(result *ParseResult) (any, error) {
-	_, expr := FirstOf(result.Results(), "Expr")
+func (p pegHandler) ParExpr(result iter.Seq2[string, any]) (any, error) {
+	_, expr := FirstOf(result, "Expr")
 	return expr, nil
 }
 
-func (p pegHandler) Literal(result *ParseResult) (any, error) {
-	_, value := FirstOf(result.Results(), "SingleExpr", "DoubleExpr")
+func (p pegHandler) Literal(result iter.Seq2[string, any]) (any, error) {
+	_, value := FirstOf(result, "SingleExpr", "DoubleExpr")
 	return Lit(value.(string)), nil
 }
 
-func (p pegHandler) CharClass(result *ParseResult) (any, error) {
-	_, pattern := FirstOf(result.Results(), "Pattern")
+func (p pegHandler) CharClass(result iter.Seq2[string, any]) (any, error) {
+	_, pattern := FirstOf(result, "Pattern")
 	return Cls(pattern.(string)), nil
 }
 
-func (p pegHandler) Ref(result *ParseResult) (any, error) {
-	_, name := FirstOf(result.Results(), "Name")
+func (p pegHandler) Ref(result iter.Seq2[string, any]) (any, error) {
+	_, name := FirstOf(result, "Name")
 	return Ref(name.(string)), nil
 }

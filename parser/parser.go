@@ -193,7 +193,7 @@ type Expr interface {
 /*
 Converts a parse result to an output object.
 */
-type Converter func(*ParseResult) (any, error)
+type Converter func(iter.Seq2[string, any]) (any, error)
 
 /*
 Returns a converter for a given rule name.
@@ -210,7 +210,7 @@ func ReflectHandler(handler any) Handler {
 		if !method.IsValid() {
 			return nil
 		}
-		return func(result *ParseResult) (any, error) {
+		return func(result iter.Seq2[string, any]) (any, error) {
 			methodArgs := make([]reflect.Value, 1)
 			methodArgs[0] = reflect.ValueOf(result)
 			returns := method.Call(methodArgs)
@@ -272,7 +272,7 @@ func (r *Rule) Parse(context *ParseContext) (any, error) {
 		return nil, err
 	}
 	if converter != nil {
-		return converter(result)
+		return converter(result.Results())
 	}
 	return context.Substring(mark), nil
 }
@@ -332,49 +332,25 @@ func (g *Grammar) Rules() iter.Seq[*Rule] {
 	}
 }
 
-/*
-Creates a new parser from this grammar with the given root and handler.
-*/
-func (g *Grammar) Parser(root string, handler any) *Parser {
-	return NewParser(root, handler, g)
-}
-
 func (g *Grammar) String() string {
 	return strings.Join(Apply(slices.Collect(g.Rules()), (*Rule).String), "\n")
 }
 
-/*
-Encapsulates the shared portion. Has the same sharing semantics as the handler.
-*/
-type Parser struct {
-	grammar *Grammar
-	root    string
-	handler Handler
-}
+type Parser[T any] func(input string) (T, error)
 
 /*
 Creates a new parser.
 */
-func NewParser(root string, handler any, grammar *Grammar) *Parser {
-	return &Parser{grammar, root, WrapHandler(handler)}
-}
-
-/*
-Parses the input according to the grammar and handler for this parser.
-*/
-func (p *Parser) Parse(input string) (any, error) {
-	return Parse(p.root, p.grammar, p.handler, input)
-}
-
-/*
-Parses the input from the new root rule.
-*/
-func (p *Parser) ParseFrom(root string, input string) (any, error) {
-	return Parse(root, p.grammar, p.handler, input)
-}
-
-func (p *Parser) String() string {
-	return fmt.Sprintf("# %s\n%s", p.root, p.grammar)
+func NewParser[T any](root string, grammar *Grammar, handler any) Parser[T] {
+	realHandler := WrapHandler(handler)
+	return func(input string) (T, error) {
+		result, err := Parse(root, grammar, realHandler, input)
+		if err != nil {
+			var t T
+			return t, err
+		}
+		return result.(T), nil
+	}
 }
 
 /*

@@ -1,6 +1,10 @@
-package parser
+package sample
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fuwjax/gopase/parser"
+)
 
 const grammar = `
 Grammar = Line (EOL Line)* EOL? EOF
@@ -35,11 +39,11 @@ EOF = !.
 /*
 Yet another Peg-grammar parser. Should be identical to Bootstrap.
 */
-var Peg = Deferred(func() *Parser {
-	g, err := Bootstrap.Parse(grammar)
+var Peg = func() *parser.Grammar {
+	grammar, err := parser.Bootstrap(grammar)
 	if err != nil {
 		fmt.Println(err)
 		return nil
 	}
-	return g.(*Grammar).Parser("Grammar", PegHandler)
-})
+	return grammar
+}()

@@ -1,20 +1,20 @@
-package parser
+package sample
 
 import (
 	"fmt"
 	"testing"
+
+	"github.com/fuwjax/gopase/parser"
 )
 
 func TestPegString(t *testing.T) {
 	t.Run("Peg String", func(t *testing.T) {
-		fmt.Println(Peg())
+		fmt.Println(Peg)
 	})
 }
 
 func TestPegParsed(t *testing.T) {
 	t.Run("Peg Equal Bootstrap", func(t *testing.T) {
-		for rule := range Peg().grammar.Rules() {
-			AssertEqual(t, rule.String(), Bootstrap.grammar.Rule(rule.name).String())
-		}
+		parser.AssertEqual(t, Peg.String(), parser.PegGrammar.String())
 	})
 }
