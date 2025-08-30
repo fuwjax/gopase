@@ -78,6 +78,13 @@ func (p *ParsePosition) advance() (*ParsePosition, error) {
 }
 
 /*
+Returns an error instance that includes the parse position information.
+*/
+func (p *ParsePosition) Error(expected string) error {
+	return p.grapheme.Error(expected)
+}
+
+/*
 ParseContext contains the state of a parse.
 */
 type ParseContext struct {
@@ -100,6 +107,10 @@ func (c *ParseContext) Mark() *ParsePosition {
 	return c.current
 }
 
+func (c *ParseContext) At(mark *ParsePosition) bool {
+	return c.current == mark
+}
+
 /*
 Resets to a previous position. Positions must come from Mark() during
 this parse operation.
@@ -119,7 +130,7 @@ func (c *ParseContext) Token() string {
 Returns an error instance that includes the parse position information.
 */
 func (c *ParseContext) Error(expected string) error {
-	return c.current.grapheme.Error(expected)
+	return c.current.Error(expected)
 }
 
 /*
@@ -263,13 +274,16 @@ Parses the input and returns a converted output object.
 */
 func (r *Rule) Parse(context *ParseContext) (any, error) {
 	var mark *ParsePosition
+	if context == nil || r == nil {
+		return nil, fmt.Errorf("WTF")
+	}
 	converter := context.handler(r.name)
 	if converter == nil { // just to avoid the reference count
 		mark = context.Mark()
 	}
 	result, err := r.expr.Parse(context)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s\nwhile in %s", err, r.name)
 	}
 	if converter != nil {
 		return converter(result.Results())

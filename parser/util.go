@@ -10,7 +10,9 @@ import (
 )
 
 func AssertEqual(t *testing.T, actual, expected any) {
-	if !reflect.DeepEqual(actual, expected) {
+	if actual == nil {
+		t.Errorf("actual nil, expected %v", expected)
+	} else if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("actual %v, expected %v", actual, expected)
 	}
 }
@@ -24,6 +26,12 @@ func AssertNil(t *testing.T, actual any) {
 func AssertError(t *testing.T, actual error, expected string) {
 	if actual.Error() != expected {
 		t.Errorf("actual %v, expected %v", actual, expected)
+	}
+}
+
+func Preserve2[T, E any](value T, err E) func() (T, E) {
+	return func() (T, E) {
+		return value, err
 	}
 }
 
@@ -66,6 +74,14 @@ func ListOf[K comparable, T any](i iter.Seq2[K, T], key K) []T {
 		}
 	}
 	return results
+}
+
+func Merge[T any](tss [][]T) []T {
+	result := make([]T, 0)
+	for _, ts := range tss {
+		result = append(result, ts...)
+	}
+	return result
 }
 
 func MapOf[T any, K comparable](source []T, key func(T) K) map[K]T {

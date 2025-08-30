@@ -141,7 +141,7 @@ func TestGraphemes(t *testing.T) {
 		args args
 		want []*Grapheme
 	}{
-		{"Normal Graphemes", args{"a\nbc"}, []*Grapheme{{"a", "\nbc", 1, 1, 1, 8414242, 20}, {"\n", "bc", 1, 2, 2, 2320992, 14}, {"b", "c", 2, 1, 3, 2320992, 16}, {"c", "", 2, 2, 4, 0, 30}}},
+		{"Normal Graphemes", args{"a\nb\\'c"}, []*Grapheme{{"a", "\nb\\'c", 1, 1, 1, 8414242, 20}, {"\n", "b\\'c", 1, 2, 2, 2320992, 14}, {"b", "\\'c", 2, 1, 3, 2334720, 20}, {"\\", "'c", 2, 2, 4, 2236416, 20}, {"'", "c", 2, 3, 5, 2320992, 20}, {"c", "", 2, 4, 6, 0, 30}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -19,7 +19,7 @@ func TestParserSeq(t *testing.T) {
 		AssertEqual(t, result, []any{"ab", "ab"})
 
 		result, err = parser("abba")
-		AssertError(t, err, "at 'b' 1:3 (3) expected a")
+		AssertError(t, err, "at 'b' 1:3 (3) expected a\nwhile in T\nwhile in S")
 		AssertNil(t, result)
 	})
 }
@@ -42,7 +42,7 @@ func TestParserAlt(t *testing.T) {
 		AssertEqual(t, result, []any{"ab"})
 
 		result, err = parser("acba")
-		AssertError(t, err, "at 'c' 1:2 (2) expected b\nat 'c' 1:2 (2) expected b")
+		AssertError(t, err, "at 'c' 1:2 (2) expected b\nwhile in T\nat 'c' 1:2 (2) expected b\nwhile in T\nwhile in S")
 		AssertNil(t, result)
 	})
 }
@@ -58,7 +58,7 @@ func TestParserCls(t *testing.T) {
 		AssertEqual(t, result, "a")
 
 		result, err = parser("x")
-		AssertError(t, err, "at 'x' 1:1 (1) expected [a-f]")
+		AssertError(t, err, "at 'x' 1:1 (1) expected [a-f]\nwhile in S")
 		AssertNil(t, result)
 	})
 }
@@ -74,7 +74,7 @@ func TestParserDot(t *testing.T) {
 		AssertEqual(t, result, "a")
 
 		result, err = parser("")
-		AssertError(t, err, "at EOF 1:0 (0) expected anything")
+		AssertError(t, err, "at EOF 1:0 (0) expected anything\nwhile in S")
 		AssertNil(t, result)
 	})
 }
@@ -112,7 +112,7 @@ func TestParserRep(t *testing.T) {
 		AssertEqual(t, result, []any{"ab"})
 
 		result, err = parser("abab")
-		AssertError(t, err, "at EOF 1:5 (5) expected a")
+		AssertError(t, err, "at EOF 1:5 (5) expected a\nwhile in S")
 		AssertNil(t, result)
 
 		result, err = parser("ababa")
@@ -139,7 +139,7 @@ func TestParserReq(t *testing.T) {
 		AssertEqual(t, result, []any{"ab"})
 
 		result, err = parser("abab")
-		AssertError(t, err, "at EOF 1:5 (5) expected a")
+		AssertError(t, err, "at EOF 1:5 (5) expected a\nwhile in S")
 		AssertNil(t, result)
 
 		result, err = parser("ababa")
@@ -147,7 +147,7 @@ func TestParserReq(t *testing.T) {
 		AssertEqual(t, result, []any{"ab", "ab"})
 
 		result, err = parser("a")
-		AssertError(t, err, "at EOF 1:2 (2) expected b")
+		AssertError(t, err, "at EOF 1:2 (2) expected b\nwhile in T\nwhile in S")
 		AssertNil(t, result)
 	})
 }
@@ -166,7 +166,7 @@ func TestParserSee(t *testing.T) {
 		AssertEqual(t, result, []any{})
 
 		result, err = parser("bab")
-		AssertError(t, err, "at 'b' 1:1 (1) expected a")
+		AssertError(t, err, "at 'b' 1:1 (1) expected a\nwhile in T\nwhile in S")
 		AssertNil(t, result)
 	})
 }
@@ -181,7 +181,7 @@ func TestParserNot(t *testing.T) {
 		parser := NewParser[any]("S", grammar, handler)
 
 		result, err := parser("ababaa")
-		AssertError(t, err, "at 'a' 1:6 (6) expected not something")
+		AssertError(t, err, "at 'a' 1:6 (6) expected not something\nwhile in S")
 		AssertNil(t, result)
 
 		result, err = parser("ababa")

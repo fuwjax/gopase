@@ -97,7 +97,7 @@ func (x *Repeated) Parse(context *ParseContext) (*ParseResult, error) {
 	for {
 		mark := context.Mark()
 		result, err := x.expr.Parse(context)
-		if err != nil {
+		if err != nil || context.At(mark) {
 			context.Reset(mark)
 			break
 		}
@@ -128,7 +128,7 @@ func (x *Required) Parse(context *ParseContext) (*ParseResult, error) {
 	for {
 		mark := context.Mark()
 		result, err = x.expr.Parse(context)
-		if err != nil {
+		if err != nil || context.At(mark) {
 			context.Reset(mark)
 			break
 		}
@@ -183,7 +183,7 @@ func (x *Literal) Parse(context *ParseContext) (*ParseResult, error) {
 }
 
 func (x *Literal) String() string {
-	return fmt.Sprintf("Lit(\"%s\")", x.literal)
+	return fmt.Sprintf("Lit(`%s`)", x.literal)
 }
 
 type Any struct{}
@@ -217,7 +217,11 @@ func (x *Reference) Parse(context *ParseContext) (*ParseResult, error) {
 	if ok {
 		context.Reset(end)
 	} else {
-		result, err = context.grammar.Rule(x.name).Parse(context)
+		rule := context.grammar.Rule(x.name)
+		if rule == nil {
+			return nil, fmt.Errorf("no such rule: %s", x.name)
+		}
+		result, err = rule.Parse(context)
 		if err != nil {
 			return nil, err
 		}

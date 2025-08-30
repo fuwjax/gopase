@@ -1,6 +1,9 @@
 package parser
 
-import "iter"
+import (
+	"iter"
+	"strings"
+)
 
 /*
 The Peg-grammar parser. Bootstrap.Parse() returns a *Grammar.
@@ -24,17 +27,21 @@ var PegGrammar = func() *Grammar {
 	peg.AddRule("Primary", Alt(Ref("Dot"), Ref("ParExpr"), Ref("Literal"), Ref("CharClass"), Ref("Ref")))
 	peg.AddRule("Dot", Lit("."))
 	peg.AddRule("ParExpr", Seq(Lit("("), Ref("WS"), Ref("Expr"), Ref("WS"), Lit(")")))
-	peg.AddRule("Literal", Alt(Seq(Lit("'"), Ref("SingleExpr"), Lit("'")), Seq(Lit("\""), Ref("DoubleExpr"), Lit("\""))))
+	peg.AddRule("Literal", Alt(Ref("SingleLit"), Ref("DoubleLit")))
 	peg.AddRule("CharClass", Ref("Pattern"))
 	peg.AddRule("Ref", Ref("Name"))
 
 	peg.AddRule("Comment", Seq(Lit("#"), Rep(Seq(Not(Ref("EOL")), Dot()))))
 	peg.AddRule("Name", Seq(Cls("[_a-zA-Z]"), Rep(Cls("[_a-zA-Z0-9]"))))
-	peg.AddRule("Pattern", Seq(Lit("["), Req(Alt(Lit("\\]"), Cls("[^\\]]"))), Lit("]")))
-	peg.AddRule("SingleExpr", Rep(Alt(Lit("\\'"), Cls("[^']"))))
-	peg.AddRule("DoubleExpr", Rep(Alt(Lit("\\\""), Cls("[^\"]"))))
-	peg.AddRule("WS", Rep(Cls("[ \\t]")))
-	peg.AddRule("EOL", Cls("[\\n\\r]"))
+	peg.AddRule("Pattern", Seq(Lit("["), Req(Alt(Lit(`\]`), Cls(`[^\]]`))), Lit("]")))
+	peg.AddRule("SingleLit", Seq(Lit(`'`), Rep(Alt(Seq(Lit(`\`), Ref("SingleEscape")), Ref("SinglePlain"))), Lit(`'`)))
+	peg.AddRule("DoubleLit", Seq(Lit(`"`), Rep(Alt(Seq(Lit(`\`), Ref("DoubleEscape")), Ref("DoublePlain"))), Lit(`"`)))
+	peg.AddRule("SingleEscape", Cls(`[\\'nrt]`))
+	peg.AddRule("DoubleEscape", Cls(`[\\"nrt]`))
+	peg.AddRule("SinglePlain", Req(Cls(`[^\\']`)))
+	peg.AddRule("DoublePlain", Req(Cls(`[^\\"]`)))
+	peg.AddRule("WS", Rep(Cls(`[ \t]`)))
+	peg.AddRule("EOL", Cls(`[\n\r]`))
 	peg.AddRule("EOF", Not(Dot()))
 	return peg
 }()
@@ -123,8 +130,52 @@ func (p pegHandler) ParExpr(result iter.Seq2[string, any]) (any, error) {
 }
 
 func (p pegHandler) Literal(result iter.Seq2[string, any]) (any, error) {
-	_, value := FirstOf(result, "SingleExpr", "DoubleExpr")
+	_, value := FirstOf(result, "SingleLit", "DoubleLit")
 	return Lit(value.(string)), nil
+}
+
+func (p pegHandler) SingleLit(results iter.Seq2[string, any]) (any, error) {
+	var sb strings.Builder
+	for name, result := range results {
+		switch name {
+		case "SinglePlain":
+			sb.WriteString(result.(string))
+		case "SingleEscape":
+			switch result.(string) {
+			case "n":
+				sb.WriteString("\n")
+			case "r":
+				sb.WriteString("\r")
+			case "t":
+				sb.WriteString("\t")
+			default:
+				sb.WriteString(result.(string))
+			}
+		}
+	}
+	return sb.String(), nil
+}
+
+func (p pegHandler) DoubleLit(results iter.Seq2[string, any]) (any, error) {
+	var sb strings.Builder
+	for name, result := range results {
+		switch name {
+		case "DoublePlain":
+			sb.WriteString(result.(string))
+		case "DoubleEscape":
+			switch result.(string) {
+			case "n":
+				sb.WriteString("\n")
+			case "r":
+				sb.WriteString("\r")
+			case "t":
+				sb.WriteString("\t")
+			default:
+				sb.WriteString(result.(string))
+			}
+		}
+	}
+	return sb.String(), nil
 }
 
 func (p pegHandler) CharClass(result iter.Seq2[string, any]) (any, error) {
