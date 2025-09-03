@@ -10,9 +10,11 @@ Parsing gets a bad rap. Parser generators are confusing, often requiring an arch
 
 Why does it need to be this way?
 
-Parsing is just a function that takes a byte or character stream and transforms it into something else. That something else can be pretty broad and still qualify as a parser. It can be a specific object, like the DOM from an HTML parser, or more generic like arrays/maps from a generic JSON parser. It can even create components in your application or do nothing more than trigger callbacks to some handler in the case of SAX. Most of the time it's a rather useless, temporal structure called an Abstract Syntax Tree (AST). So a parser just takes data and turns it into something, that's a pretty broad classification for a function.
+Parsing is just a function that takes a byte stream and transforms it into something else. That something else can be pretty broad and still qualify as a parser. It can be a specific object, like the DOM from an HTML parser, or more generic like arrays/maps from a generic JSON parser. It can even create components in your application or do nothing more than trigger callbacks to some handler in the case of SAX. Most of the time it's a rather useless, temporal structure called an Abstract Syntax Tree (AST). So a parser just takes a sequence and turns it into a something, that's a pretty broad classification for a function.
 
-There are loads of algorithms available to the ambitious parser writer. For this project, I intend to implement 3 - PEG, Earley and TBD. That last one isn't a parser algorithm, it's just me being wishy-washy in what sort of top-down parser I'll add to the mix. Gonna be honest here, I know they're the only actual popular parser strategies, and I understand the reasons why. But if you are writing your own parser without wanting to become a parser fanatic, then you almost certainly want to use PEG.
+It's that breadth that is ultimately the scariest part of parsing. If it's just a black box that turns persistent data into usable data, then what exactly makes that black box do the right thing. For that matter, how do you even know if the black box is doing the right thing? Where do you even start?
+
+There are loads of algorithms available to the ambitious parser writer. For this project, I intend to implement 3 - PEG, Earley and TBD. That last one isn't a parser algorithm, it's just me being wishy-washy in what sort of top-down parser I'll add to the mix. Gonna be honest here, I know they're the only actual popular parser strategies, and I understand the reasons why. But if you are writing your own parser without wanting to become a parser fanatic, then you almost certainly want to use PEG. Well, except when you should use Earley. 
 
 ### So what makes gopase unique
 
@@ -30,17 +32,18 @@ Most of the time, when we talk about a parser we mean something that combines th
 
 Regular expressions often have a way of matching that includes the expression, something like Regex.match(/[a-f]/, "hello") and something that lets you precompile the expression, so something like Regex.compile(/[a-f]/).match("hello"). Everyone thinks they need the expression at some point, and no one thinks of the compile as something special. It's for efficiency and performance, not some sort of ivory tower magic.
 
-So, parsing requires those 5 things, perhaps not all at the same time, but if you don't have those 5 things, then you had to do something that took a lot of effort to solve a problem that already took a lot of effort.
+So, parsing requires those 5 things, perhaps not all at the same time, but if you don't have those 5 things, then you had to do something that took a lot of effort to solve a problem that already took a lot of effort. Mustache, I'm looking at you.
 
-The normal process is to hand the engine the set of grammar, root, and handler objects and get back a reusable parser that specifically parses those sematics into those outputs. And then you can hand whatever input you want to that reusable parser and it will happily churn out the outputs according to its particular rules and callbacks. So just like with the regex example, we have a notion of a compile step that takes the reusable bits and squishes them together, returning that function from an input to an output.
+The normal process is to hand the engine the set of grammar, root, and handler objects and get back a reusable parser that specifically parses inputs matching the rules of the grammar into outputs produced by the handler. And then you can hand whatever input you want to that reusable parser and it will happily churn out the outputs according to its particular rules and callbacks. So just like with the regex example, we have a notion of a compile step that takes the reusable bits and squishes them together, returning that function from an input to an output.
 
-### Timeline of gopase
+### The gopase roadmap
 
 1) Bootstrap PEG parser. This is a hardcoded parser that converts grammars into parsers. At this point we have a grammar specification for PEG grammars, and a handler that produces PEG parsers.
-2) Template engine. This is a parser that consumes according to a template grammar. So this is a grammar specification for the templating language, and a handler that produces an object that knows how to walk an object graph and render text.
-3) PEG code template. This is a template specific to serializing PEG grammars. So this is a template that walks a PEG parser and serializes that into valid go code. At this point the bootstrap can be replaced with this output as desired. The template engine and various samples like JSON and CSV can get their own hardcoded variants.
-4) Earley parser. This is a PEG grammar that can produce an Earley parser. This gets a little mind-bendy, but there isn't anything anywhere that says the same strategy has to be used for every turtle. At this point we can start making comparisons between the two.
-5) Chesur. I created a language many moons ago that made it super easy to write parsers/serializers with a PEG mindset. I look forward to revisiting it.
+1.1) Sample PEG grammars, say the PEG grammar for the PEG flavor matched by the Bootstrap, CSV, JSON, that sort of thing.
+2) Template engine. This is a parser that consumes according to a template grammar. So this is a grammar specification for the templating language, and a handler that produces an object that knows how to walk an object graph and render text. My thought was to just implement Mustache. But it wound up being more fun to create something better.
+3) PEG code template. This is a template that takes the object oriented output of the Bootstrap and converts it to an imperative parser. This gets a little overwhelming, but at this point the Bootstrap is a code-generated imperative parser that can produce an OO parser for a given grammar input. This OO parser can then be handed off to the template to produce a code-generated imperative parser for that grammar. So we can give the Bootstrap a grammar file that happens to match it's own ruleset, then hand that off to the template engine to generate the code that is in fact, the Bootstrap itself. Egg, meet thy Chicken. The template engine and various samples like JSON and CSV can get their own hardcoded variants. In theory the template engine could also get an imperative corrolary, but I've honestly never thought about solving that before.
+4) Earley parser. This is a PEG grammar that can produce an Earley parser. This gets a little mind-bendy, but there isn't anything anywhere that says the same strategy has to be used for every turtle. At this point we can start making comparisons between the two, and diving into their various pros and cons.
+5) Chesur. I created a language many moons ago that made it super easy to write parsers/serializers with a PEG mindset without the silliness of EBNF. I look forward to revisiting it.
 6) TBD parser. My gut says this will be a predictive recursive descent parser. Time will tell.
 
 ### How do we use this PEG parser
@@ -57,10 +60,10 @@ The PEG specification works like this
     Basic Expressions
         "some string" - Literal match of the exact string sequence, without the double quotes
         'some string' - Literal match of the exact string sequence, without the single quotes
-        [a-b] - Regex match of the character class
+        [a-b] - Regex match of the character class. This is handed directly to the native regexp package, so if Go supports it, so does this parser
         . - Matches any single character
         Name - reference match of rule by name, can cycle or recurse
-    Extended Expressions (Expr stands for any valid sub expression)
+    Extended Expressions (x and y stand for any valid sub expression)
         x y ... - sequence of expressions must follow in that order
         x / y / ... - options for expressions matches the first success
         (x) - expressions can be enclosed in parentheses for grouping
@@ -91,3 +94,110 @@ And a handler
 Then the results passed into Record would be a series of "Field" keys with the corresponding result from the Field() handler followed by a single "EOL" result. The EOL rule would
 likely not have a handler, and would therefore contain the string match accepted by the Rule, say the string "\n".
 
+### What was this about a template engine?
+
+I genuinely tried to write Mustache. I got pretty far down the implementation, but ran into a couple snags. The first is that the only way I could think to implement parts of the Mustache grammar was to either post-process or implement look-behinds. Gopase's PEG implementation already has look-aheads, but look-behinds would break the ways I'm able to make the parser memory efficient. I could work around that, I'm pretty sure, but I was trying to write a template engine, not rethink the parser.
+
+The second was a little more difficult. Technically, templating engines that let you change the open/close delimiters from inside the parse aren't really the sort of thing you can do in most rule-based parsing algorithms. One of the cool things about an OO PEG implementation is that, at least in theory, dynamic changes at runtime to the rules is possible. But I can't really think of a good way to do it that would work well every time, and in a way that end users can just change willy-nilly. Templating engines are often used within builds to render things with very little oversight. I'd hate to implement something that could make things go wildly wrong with no way of telling anyone they did.
+
+I'm decently sure that most Mustache implementations are using a whole bunch of regular expression ReplaceAll's under the covers, but that's just a guess.
+
+Anyway, as I was considering how to implement these two features in the parser in ways that didn't offend my delicate sensibilities, I had another thought. My whole claim is that having your own parser means making a thing you want the way you want it. So...
+
+### Happy
+#### Templating for the Soul
+
+Does the world need another templating engine? Nope. Necessity may be the mother of invention, but the grandmama is often the raw unadulterated joy of introducing the world to something it hasn't seen before.
+
+	(^ ^) are the open/close delimeters from all (well, most) of the tags in Happy
+	(^name^) usually you'll put something in between the carrots to indicate what you'd like to render in place of the tag
+	( ^name^ ) whitespace around tags is usually preserved, but a single space between the carrot and the tag 
+			will consume all the whitespace in that direction
+	(^# comments can contain anything but close tags ^) they can even be multiline
+	(^*name^)...(^/^) will render the bit between the start and end tags. 
+			We'll need to talk about contexts and keys a bit more for this to make sense.
+	(^!name^)...(^/^) will render the bit between the start and end tags, but only if name doesn't exist in the context
+	(^="Text")...(^/^) will define an inline partial. We'll talk more partials later
+	(^>"Text") will render and insert a partial
+
+And that's it. Well, for right now. There's one more tag type that's a little bit crazy, too crazy to bother implementing at the moment. But that's it - Comments, Values, Sections, Inversions, Partials, and Includes. We'll have to spend a little bit talking about contexts and keys (names and Texts in the summary above). But yeah, pretty simple stuff.
+
+"Isn't that just mustache with kitty emojis instead of handlebars?" Kinda, yeah. I took a lot of inspiration from mustache, since you know, I had implemented a big chunk of it. But there are a few things here that really stand out to me. And one of the big things is being very direct about how Happy interprets the Mustache idea of "logic-less".
+
+There's logic here. It's a computer program after all, that takes computer-y things and turns them into string-y things. And the logic Happy needs to work its magic has to come from the person writing the template, otherwise it would just be serializing data like JSON does. But the "missing" logic is any meaningful way of influencing that magical work via code written in the template itself.
+
+Each of the tags (aside from comments) takes a "key", and that's it. The key is just a way of selecting data from the context. The context is a stack of data, and the only time anything is pushed on or popped off the stack is when entering or leaving a Section (the # tag). Well, key resolution can temporarily use the stack, but don't worry abou tthat just yet.
+
+So a template is just a set of 5 instructions where the only information needed to perform the operation is a key and optionally, some content between a start and end tag. A Value tag (^^) resolves the key against the context to get some value, and then replaces the tag in the output with that value converted to a string. The Section tag (^*^) resolves the key against the context to get some value, and then iterates over the contents of that value by pushing them on to the context one at a time and rendering the content until it reaches the corresponding end tag (^/^). The Inversion tag (^!^) resolves the key against the context to get some value, and if that value is false-y (in go-ese, a zero value) then it renders the bit until the end tag (^/^). The Partial tag (^=^) resolves the key against the context to get some value, turns that value into a string as though it were replacing a Value tag, and then snips the content until the end tag (^/^) and registers it as a partial. The Include tag (^>^) resovles the key, turns it into a string, looks for a partial registered by that name, and replaces the tag with the rendered partial.
+
+Just to say it somewhere, partials don't have to be defined in the template where they're used. They can be passed in as a map to the Render function.
+
+The context is just a stack. The partials are just a map. There are only 5 instructions. How does this even do anything useful?
+
+### Keys are weird, aren't they...
+
+Yup. Keys are a way of selecting data from the stack. Well, they don't have to be, I guess. 
+
+	(^"literal"^) would literally replace the tag with the literal "literal"
+
+Usually, you'd use a naked literal for Partials and Includes, but I'm not here to tell you what to do. Well, I mean, I guess I am. But just this once, you do you.
+
+	(^name^) means search the context for the first element that has a "name" and replace this tag with that "name" value
+
+That element could be a map[string]Something or yourpackage.Person, pointer or raw.
+
+	(^0^) you could even use a number to pull from a slice or array.
+
+You can't get any properties from a scalar (things like numbers or booleans or strings), but the property you pull can be a scalar. Doesn't have to be. Things can get pretty weird.
+
+And it doesn't have to be from the top of the stack. So, if you think about nested Sections, it's going to travel back up through the Section data looking for a match to the key.
+
+Cool. That doesn't feel so weird. 
+
+	(^.^) a dot means to use the top of the stack in its entirety. 
+	(^@^) an at means to use the index of the top of the stack from its Section container
+
+Ok, that might be confusing. Remember that a Section is sort of the control flow operation. It tries to resolve the key, and if that key is a container (map, slice, array) then it interates over that container and renders each key-value pair with the Section's inner template. The . means to use the value, the @ means to use the container key. The container key is never included in the search path for key resolution. Which is confusing now that I say it out loud: we don't use keys for figureing out keys. But it's the truth. The only way to get the container key is with the @ and even then, it's only the top level one.
+
+Just to say it, if the section's key resolves to something that isn't a container, it just renders the inner template once with that value. So it acts more like an "if" than a "for" in that situation.
+
+Sometimes you want to go walking around a data structure, and it would be exhausting to have a whole bunch of nested sections. So instead you can just use dots to separate the nested keys.
+
+	(^you.can.even.321.use.numbers^)
+
+So it'll try to resolve "you" against the context, and if it does, it will push it on the stack (temporarily, of course, just for this one key resolution) and then resolve"can" against that new context. If "even" here were to return an array or slice and that array or slice had at least 322 elements, then the 321 would try to grab the 321th element, you know, from zero.
+
+If the key resolves all the way down the dotted sequence, then whatever that final result is will be used to replace the tag, and all the temporary things stuffed into the context will be cleansed from their unholy union... I mean, popped from the top. Key resolution doesn't change the stack for anything other than key resolution.
+
+I know what you're thinking. "You said this was wierd, but really it's just a very long-winded way of saying 'Like Mustache'". And you're right. Did I mention I implemented a mostly mustache template engine before I decided to do something "better"? Better here means by my metric which is explicitly "not having to make a whole bunch of changes to my sacred parser."
+
+Ok, so here's where things get a little bonkers. 
+
+	(^you.can["use"][brackets].too^)
+
+I know, I know... at this point you're wondering if there's someone you should call. Like a wellness check. Do they do wellness checks for inflated egos? Is it ok to ask the cops to swing by and check on someone because they hung their own macaroni art on their fridge? Stick with me, I promise this is a bit brain melting. Yeah, brackets, head exploding brackets.
+
+remember, keys are all about context searching, and key resolution temporarily sticks things on the context stack, yada yada. Brackets don't go on the stack until they're done. So, "you" resolves, goes on the stack. "can["use"][brackets]" resolves and goes on the stack. Wait, what does that mean, exactly?
+
+So, "can" searches the context looking for a property called "can". Finds it, but doesn't push it on to the stack. Then we resolve '"use"' against the stack. The literal string "use". Remember way back at the beginning when I mocked you a bit for using a string literal for something other than partial names? Well, here, we resolve the literal "use" to literally itself... ok, not impressed, I see that. But look at "brackets". We resolve "brackets" against the same context we resolved "can" against. Weird, right?
+
+Because then, after we resolve the value for "can", we take "use" and resolve it against "can" and we resolve the result of resolving brackets against the context against the result of use against can... and I lost you.
+
+Told you this was weird. There are two resolutions, once trying to figure out what "brackets" means against the context of "you" and once more trying to figure out whatever that value was against the context of "you.can.use".
+
+But there's more. Bracket expressions, in addition to being able to work like dotted expressions against maps and structs and interfaces and slices and arrays. Oh... did I mention that you can hit interfaces? Methods on structs? Yup, no problem. You can stick funcs in those maps and slices and arrays too. But anyway, in addition to just fetching things like dotted keys, brackets let you call those functions and methods with arguments. You can call zero arg functions with just dots, you can even use iter.Seq2's in Section iteration. But brackets can expand into function arguments to do things like
+
+	(^Type[.]^) which could call a Type function from somewhere in the context and pass it the top of the context.
+	(^=Type[.]^) or include a partial named by the result of that function
+
+This was a pretty common ask from out in the interwebs about Mustache. How can you render based on the value of some property? With Happy, it's pretty trivial. Mind bending maybe, but trivially mind bending. 
+
+Check out the Peg template - grammar.Rules returns an iter.Seq2 so that I can control the order that it iterates over the rules. All those partials at the start of the template define the way to render expressions based on the struct name, which is then referenced by the exact Type expression in the code above. The @ even makes an appearance, leveraging the zero index to omit the first comma in a list. 
+
+I'll add in the 6th tag at some point. It'll let you do a double render among other things, which is always something super painful to do in most template languages. It's also something that is rarely the right solution to a rendering conundrum, so I'm not in any rush. Prove me wrong.
+
+And I really do hope that seeing all these fun little ascii emojis in your template genuinely makes you happy while you write them. I've already started naming them things like (^.^) kitty and (^/^) lefty and (^=^) rosie. OH oh oh, I totally forgot to mention - end tags are comments too.
+
+	(^*Bob^).........(^/'s your uncle^) is totally fine. Comments/End tags can be multiline and contain anything other than a ^) or ^ )
+
+Truly, I hope Happy works, for both your templating needs, and your soul.
