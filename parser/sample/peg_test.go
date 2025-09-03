@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/fuwjax/gopase/funki/testi"
 	"github.com/fuwjax/gopase/parser"
 )
 
@@ -15,6 +16,6 @@ func TestPegString(t *testing.T) {
 
 func TestPegParsed(t *testing.T) {
 	t.Run("Peg Equal Bootstrap", func(t *testing.T) {
-		parser.AssertEqual(t, Peg.String(), parser.PegGrammar.String())
+		testi.AssertEqual(t, Peg.String(), parser.PegGrammar.String())
 	})
 }

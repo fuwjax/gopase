@@ -2,13 +2,16 @@ package parser
 
 import (
 	"iter"
+	"slices"
 	"strings"
+
+	"github.com/fuwjax/gopase/funki"
 )
 
 /*
 The Peg-grammar parser. Bootstrap.Parse() returns a *Grammar.
 */
-var Bootstrap = NewParser[*Grammar]("Grammar", PegGrammar, PegHandler)
+var Bootstrap = BootstrapParser[*Grammar]("Grammar", PegGrammar, PegHandler)
 
 var PegGrammar = func() *Grammar {
 	peg := NewGrammar()
@@ -51,7 +54,7 @@ var PegHandler = WrapHandler(pegHandler{})
 type pegHandler struct{}
 
 func (p pegHandler) Grammar(result iter.Seq2[string, any]) (any, error) {
-	rules := Cast[*Rule](Filter(ListOf(result, "Line"), func(r any) bool { return r != nil }))
+	rules := slices.Collect(funki.Cast[*Rule](funki.FilterNonNil(funki.Values(funki.FilterKeys(result, "Line")))))
 	grammar := NewGrammar()
 	for _, rule := range rules {
 		grammar.Add(rule)
@@ -60,63 +63,63 @@ func (p pegHandler) Grammar(result iter.Seq2[string, any]) (any, error) {
 }
 
 func (p pegHandler) Line(result iter.Seq2[string, any]) (any, error) {
-	_, rule := FirstOf(result, "Rule")
+	_, rule := funki.FirstOf(result, "Rule")
 	return rule, nil
 }
 
 func (p pegHandler) Rule(result iter.Seq2[string, any]) (any, error) {
-	_, name := FirstOf(result, "Name")
-	_, expr := FirstOf(result, "Expr")
+	_, name := funki.FirstOf(result, "Name")
+	_, expr := funki.FirstOf(result, "Expr")
 	return NewRule(name.(string), expr.(Expr)), nil
 }
 
 func (p pegHandler) Expr(result iter.Seq2[string, any]) (any, error) {
-	seqs := Cast[Expr](ListOf(result, "Seq"))
+	seqs := funki.ListOf[Expr](result, "Seq")
 	return Alt(seqs...), nil
 }
 
 func (p pegHandler) Seq(result iter.Seq2[string, any]) (any, error) {
-	prefixs := Cast[Expr](ListOf(result, "Prefix"))
+	prefixs := funki.ListOf[Expr](result, "Prefix")
 	return Seq(prefixs...), nil
 }
 
 func (p pegHandler) Prefix(result iter.Seq2[string, any]) (any, error) {
-	_, value := FirstOf(result, "AndExpr", "NotExpr", "Suffix")
+	_, value := funki.FirstOf(result, "AndExpr", "NotExpr", "Suffix")
 	return value, nil
 }
 
 func (p pegHandler) AndExpr(result iter.Seq2[string, any]) (any, error) {
-	_, expr := FirstOf(result, "Suffix")
+	_, expr := funki.FirstOf(result, "Suffix")
 	return See(expr.(Expr)), nil
 }
 
 func (p pegHandler) NotExpr(result iter.Seq2[string, any]) (any, error) {
-	_, expr := FirstOf(result, "Suffix")
+	_, expr := funki.FirstOf(result, "Suffix")
 	return Not(expr.(Expr)), nil
 }
 
 func (p pegHandler) Suffix(result iter.Seq2[string, any]) (any, error) {
-	_, value := FirstOf(result, "OptExpr", "RepExpr", "ReqExpr", "Primary")
+	_, value := funki.FirstOf(result, "OptExpr", "RepExpr", "ReqExpr", "Primary")
 	return value, nil
 }
 
 func (p pegHandler) OptExpr(result iter.Seq2[string, any]) (any, error) {
-	_, expr := FirstOf(result, "Primary")
+	_, expr := funki.FirstOf(result, "Primary")
 	return Opt(expr.(Expr)), nil
 }
 
 func (p pegHandler) RepExpr(result iter.Seq2[string, any]) (any, error) {
-	_, expr := FirstOf(result, "Primary")
+	_, expr := funki.FirstOf(result, "Primary")
 	return Rep(expr.(Expr)), nil
 }
 
 func (p pegHandler) ReqExpr(result iter.Seq2[string, any]) (any, error) {
-	_, expr := FirstOf(result, "Primary")
+	_, expr := funki.FirstOf(result, "Primary")
 	return Req(expr.(Expr)), nil
 }
 
 func (p pegHandler) Primary(result iter.Seq2[string, any]) (any, error) {
-	_, value := FirstOf(result, "Dot", "ParExpr", "Literal", "CharClass", "Ref")
+	_, value := funki.FirstOf(result, "Dot", "ParExpr", "Literal", "CharClass", "Ref")
 	return value, nil
 }
 
@@ -125,12 +128,12 @@ func (p pegHandler) Dot(result iter.Seq2[string, any]) (any, error) {
 }
 
 func (p pegHandler) ParExpr(result iter.Seq2[string, any]) (any, error) {
-	_, expr := FirstOf(result, "Expr")
+	_, expr := funki.FirstOf(result, "Expr")
 	return expr, nil
 }
 
 func (p pegHandler) Literal(result iter.Seq2[string, any]) (any, error) {
-	_, value := FirstOf(result, "SingleLit", "DoubleLit")
+	_, value := funki.FirstOf(result, "SingleLit", "DoubleLit")
 	return Lit(value.(string)), nil
 }
 
@@ -179,11 +182,11 @@ func (p pegHandler) DoubleLit(results iter.Seq2[string, any]) (any, error) {
 }
 
 func (p pegHandler) CharClass(result iter.Seq2[string, any]) (any, error) {
-	_, pattern := FirstOf(result, "Pattern")
+	_, pattern := funki.FirstOf(result, "Pattern")
 	return Cls(pattern.(string)), nil
 }
 
 func (p pegHandler) Ref(result iter.Seq2[string, any]) (any, error) {
-	_, name := FirstOf(result, "Name")
+	_, name := funki.FirstOf(result, "Name")
 	return Ref(name.(string)), nil
 }

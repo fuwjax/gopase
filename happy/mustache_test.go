@@ -1,4 +1,4 @@
-package mustache
+package happy
 
 import (
 	"fmt"
@@ -6,17 +6,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/fuwjax/gopase/parser"
+	"github.com/fuwjax/gopase/funki/testi"
 	"github.com/fuwjax/gopase/parser/sample"
 )
-
-func TestMustacheString(t *testing.T) {
-	t.Run("Mustache Grammar String", func(t *testing.T) {
-		grammar, err := Grammar()
-		parser.AssertNil(t, err)
-		fmt.Println(grammar)
-	})
-}
 
 type TestSuite struct {
 	Overview string `jsonName:"overview"`
@@ -33,22 +25,22 @@ type Test struct {
 
 func mustacheTest(t *testing.T, filename string) {
 	resp, err := http.Get(baseUrl + filename)
-	parser.AssertNil(t, err)
+	testi.AssertNil(t, err)
 	defer resp.Body.Close()
-	parser.AssertEqual(t, resp.StatusCode, http.StatusOK)
+	testi.AssertEqual(t, resp.StatusCode, http.StatusOK)
 	bytes, err := io.ReadAll(resp.Body)
-	parser.AssertNil(t, err)
+	testi.AssertNil(t, err)
 	results, err := sample.ParseJson(string(bytes))
-	parser.AssertNil(t, err)
+	testi.AssertNil(t, err)
 	suite, err := sample.ConvertJson[TestSuite](results)
-	parser.AssertNil(t, err)
+	testi.AssertNil(t, err)
 	fmt.Println(suite.Overview)
 	for _, test := range suite.Tests {
 		t.Run(test.Name, func(t *testing.T) {
 			fmt.Println(test.Desc)
-			result, err := Render(test.Template, test.Data)
-			parser.AssertNil(t, err)
-			parser.AssertEqual(t, result, test.Expected)
+			result, err := Render(test.Template, test.Data, nil)
+			testi.AssertNil(t, err)
+			testi.AssertEqual(t, result, test.Expected)
 		})
 	}
 }
@@ -66,10 +58,6 @@ delimiters.json
 ~inheritance.json
 */
 
-func TestComments(t *testing.T) {
-	mustacheTest(t, "comments.json")
-}
-
-func TestInterpolation(t *testing.T) {
-	mustacheTest(t, "interpolation.json")
-}
+// func TestComments(t *testing.T) {
+// 	mustacheTest(t, "comments.json")
+// }

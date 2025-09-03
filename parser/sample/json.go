@@ -6,7 +6,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 
+	"github.com/fuwjax/gopase/funki"
 	"github.com/fuwjax/gopase/parser"
 )
 
@@ -23,22 +25,19 @@ Hex = [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]
 WS = [ \r\n\t]*
 `
 
-var JsonGrammar = parser.Preserve2(parser.Bootstrap(jsonGrammar))
+var JsonParserFrom = sync.OnceValue(func() parser.ParserFrom {
+	return parser.NewParserFrom(jsonGrammar, jsonHandler{})
+})
+var JsonParser = sync.OnceValue(func() parser.Parser[any] {
+	return parser.NewParser[any]("Value", jsonGrammar, jsonHandler{})
+})
 
 func ParseJson(input string) (any, error) {
-	return ParseJsonFrom("Value", input)
+	return JsonParser()(input)
 }
 
 func ParseJsonFrom(root, input string) (any, error) {
-	grammar, err := JsonGrammar()
-	if err != nil {
-		return nil, err
-	}
-	result, err := parser.Parse(root, grammar, parser.WrapHandler(jsonHandler{}), input)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return JsonParserFrom()(root, input)
 }
 
 func ConvertJson[T any](data any) (T, error) {
@@ -122,7 +121,7 @@ func ConvertJsonArray(data []any, target reflect.Type) (any, error) {
 type jsonHandler struct{}
 
 func (h jsonHandler) Value(results iter.Seq2[string, any]) (any, error) {
-	name, value := parser.FirstOf(results, "String", "Object", "Array", "Number", "Literal")
+	name, value := funki.FirstOf(results, "String", "Object", "Array", "Number", "Literal")
 	switch name {
 	case "Number":
 		return strconv.ParseFloat(value.(string), 64)
@@ -154,7 +153,8 @@ func (h jsonHandler) Object(results iter.Seq2[string, any]) (any, error) {
 }
 
 func (h jsonHandler) Array(results iter.Seq2[string, any]) (any, error) {
-	return parser.ListOf(results, "Value"), nil
+	values := funki.ListOf[any](results, "Value")
+	return values, nil
 }
 
 func (h jsonHandler) String(results iter.Seq2[string, any]) (any, error) {

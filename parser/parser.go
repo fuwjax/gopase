@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+
+	"github.com/fuwjax/gopase/funki"
 )
 
 /*
@@ -249,7 +251,9 @@ func WrapHandler(handler any) Handler {
 	}
 	m, ok := handler.(map[string]Converter)
 	if ok {
-		return Map2Func(m)
+		return func(key string) Converter {
+			return m[key]
+		}
 	}
 	return ReflectHandler(handler)
 }
@@ -336,10 +340,10 @@ func (g *Grammar) Rule(name string) *Rule {
 /*
 Returns the rules specifying this grammar.
 */
-func (g *Grammar) Rules() iter.Seq[*Rule] {
-	return func(yield func(*Rule) bool) {
+func (g *Grammar) Rules() iter.Seq2[string, *Rule] {
+	return func(yield func(string, *Rule) bool) {
 		for _, name := range g.order {
-			if !yield(g.rules[name]) {
+			if !yield(name, g.rules[name]) {
 				return
 			}
 		}
@@ -347,18 +351,46 @@ func (g *Grammar) Rules() iter.Seq[*Rule] {
 }
 
 func (g *Grammar) String() string {
-	return strings.Join(Apply(slices.Collect(g.Rules()), (*Rule).String), "\n")
+	return strings.Join(funki.Apply(slices.Collect(funki.Values(g.Rules())), (*Rule).String), "\n")
 }
 
 type Parser[T any] func(input string) (T, error)
 
+type ParserFrom func(root, input string) (any, error)
+
 /*
 Creates a new parser.
 */
-func NewParser[T any](root string, grammar *Grammar, handler any) Parser[T] {
-	realHandler := WrapHandler(handler)
+func NewParser[T any](root string, grammar string, handler any) Parser[T] {
+	parser := NewParserFrom(grammar, handler)
 	return func(input string) (T, error) {
-		result, err := Parse(root, grammar, realHandler, input)
+		result, err := parser(root, input)
+		if err != nil {
+			var t T
+			return t, err
+		}
+		if result == nil {
+			var zero T
+			return zero, nil
+		}
+		return result.(T), nil
+	}
+}
+
+func NewParserFrom(grammar string, handler any) ParserFrom {
+	rules, err := Bootstrap(grammar)
+	realHandler := WrapHandler(handler)
+	return func(root, input string) (any, error) {
+		if err != nil {
+			return nil, err
+		}
+		return Parse(root, rules, realHandler, input)
+	}
+}
+
+func BootstrapParser[T any](root string, grammar *Grammar, handler Handler) Parser[T] {
+	return func(input string) (T, error) {
+		result, err := Parse(root, grammar, handler, input)
 		if err != nil {
 			var t T
 			return t, err

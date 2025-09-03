@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/fuwjax/gopase/funki"
 )
 
 type Sequence struct {
@@ -30,7 +32,7 @@ func (x *Sequence) Parse(context *ParseContext) (*ParseResult, error) {
 }
 
 func (x *Sequence) String() string {
-	return "Seq(" + strings.Join(Apply(x.exprs, Expr.String), ", ") + ")"
+	return "Seq(" + strings.Join(funki.Apply(x.exprs, Expr.String), ", ") + ")"
 }
 
 type Options struct {
@@ -42,6 +44,22 @@ func Alt(exprs ...Expr) Expr {
 		return exprs[0]
 	}
 	return &Options{exprs}
+}
+
+/*
+Allows for multiple "causes" to aggregate into a single error. This isn't really helping with parsing
+error reporting, so don't depend on it.
+*/
+type PolyError struct {
+	Errors []error
+}
+
+func (es *PolyError) Add(e error) {
+	es.Errors = append(es.Errors, e)
+}
+
+func (es *PolyError) Error() string {
+	return strings.Join(funki.Apply(es.Errors, error.Error), "\n")
 }
 
 func (x *Options) Parse(context *ParseContext) (*ParseResult, error) {
@@ -59,7 +77,7 @@ func (x *Options) Parse(context *ParseContext) (*ParseResult, error) {
 }
 
 func (x *Options) String() string {
-	return "Alt(" + strings.Join(Apply(x.exprs, Expr.String), ",") + ")"
+	return "Alt(" + strings.Join(funki.Apply(x.exprs, Expr.String), ",") + ")"
 }
 
 type Optional struct {

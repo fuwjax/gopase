@@ -3,7 +3,9 @@ package sample
 import (
 	"iter"
 	"strings"
+	"sync"
 
+	"github.com/fuwjax/gopase/funki"
 	"github.com/fuwjax/gopase/parser"
 )
 
@@ -19,16 +21,12 @@ EOL = [\n\r]
 EOF = !.
 `
 
+var CsvParser = sync.OnceValue(func() parser.Parser[[][]string] {
+	return parser.NewParser[[][]string]("Records", csvGrammar, csvHandler{})
+})
+
 func ParseCsv(input string) ([][]string, error) {
-	grammar, err := parser.Bootstrap(csvGrammar)
-	if err != nil {
-		return nil, err
-	}
-	result, err := parser.Parse("Records", grammar, parser.WrapHandler(csvHandler{}), input)
-	if err != nil {
-		return nil, err
-	}
-	return result.([][]string), nil
+	return CsvParser()(input)
 }
 
 func ParseCsvMap(input string) ([]map[string]string, error) {
@@ -50,20 +48,22 @@ func ParseCsvMap(input string) ([]map[string]string, error) {
 type csvHandler struct{}
 
 func (h csvHandler) Records(results iter.Seq2[string, any]) (any, error) {
-	return parser.Cast[[]string](parser.ListOf(results, "Record")), nil
+	records := funki.ListOf[[]string](results, "Record")
+	return records, nil
 }
 
 func (h csvHandler) Record(results iter.Seq2[string, any]) (any, error) {
-	return parser.Cast[string](parser.ListOf(results, "Field")), nil
+	fields := funki.ListOf[string](results, "Field")
+	return fields, nil
 }
 
 func (h csvHandler) Field(results iter.Seq2[string, any]) (any, error) {
-	_, value := parser.FirstOf(results, "Quoted", "Bare")
+	_, value := funki.FirstOf(results, "Quoted", "Bare")
 	return value.(string), nil
 }
 
 func (h csvHandler) Quoted(results iter.Seq2[string, any]) (any, error) {
-	_, value := parser.FirstOf(results, "Inner")
+	_, value := funki.FirstOf(results, "Inner")
 	value = strings.ReplaceAll(value.(string), "\"\"", "\"")
 	return value.(string), nil
 }
