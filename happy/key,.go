@@ -60,7 +60,7 @@ type InvertKey struct {
 
 func (invert InvertKey) Resolve(context *Context) (any, bool) {
 	result, ok := invert.key.Resolve(context)
-	if !ok || result == nil {
+	if !ok || !Truthy(result) {
 		return nil, true
 	}
 	return nil, false

@@ -11,7 +11,7 @@ import (
 
 func TestPegTemplate(t *testing.T) {
 	t.Run("PegTemplate", func(t *testing.T) {
-		output, err := sample.RenderPeg("sample", "Peg", parser.PegGrammar)
+		output, err := sample.RenderPeg(parser.PegGrammar, map[string]any{"package": "sample", "name": "Peg"})
 		testi.AssertNil(t, err)
 		fmt.Println(output)
 	})

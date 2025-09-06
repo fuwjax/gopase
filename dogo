@@ -1,0 +1,24 @@
+#!/usr/bin/env zsh
+
+DOclean () {
+    go clean
+    [ -f sample/peg.go ] && rm sample/peg.go
+}
+
+DObuild () {
+    DOclean
+    [ -d bin ] || mkdir bin
+    go build -o bin/app
+}
+
+DOtest () {
+    DObuild
+    pushd sample
+    ../bin/app peg.peg > peg.go
+    diff peg.go peg.gold
+    popd
+}
+
+CMD=DO${1}
+shift
+${CMD} $@

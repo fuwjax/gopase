@@ -100,6 +100,30 @@ func Get(data any, key string) (any, bool) {
 	return devalue(getIndirect(reflect.ValueOf(data), key))
 }
 
+func Truthy(data any) bool {
+	if data == nil {
+		return false
+	}
+	return truthyIndirect(reflect.ValueOf(data))
+}
+
+func truthyIndirect(value reflect.Value) bool {
+	if !value.IsValid() { // trust that IsZero catches nil?
+		return false
+	}
+	switch value.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		return !value.IsNil() && truthyIndirect(value.Elem())
+	case reflect.Array, reflect.Map, reflect.Slice:
+		return value.Len() > 0
+		//case reflect.Func, reflect.Chan: I guess we have to just see where it goes?
+	case reflect.Struct:
+		return true
+	default:
+		return !value.IsZero()
+	}
+}
+
 func devalue(result reflect.Value) (any, bool) {
 	if !result.IsValid() {
 		return nil, false

@@ -61,11 +61,14 @@ type Section struct {
 
 func (s *Section) Render(context *Context, partials map[string]*Template) (string, error) {
 	data, ok := s.Name.Resolve(context)
-	if data == nil || !ok {
+	if !ok || data == nil {
 		return "", nil
 	}
 	slice, ok := Iter(data)
 	if !ok {
+		if !Truthy(data) {
+			return "", nil
+		}
 		return s.Content.Render(context.With(nil, data), partials)
 	}
 	var sb strings.Builder
@@ -85,7 +88,7 @@ type Reference struct {
 
 func (r *Reference) Render(context *Context, partials map[string]*Template) (string, error) {
 	data, ok := r.Name.Resolve(context)
-	if !ok && data == nil {
+	if !ok && !Truthy(data) {
 		return "", nil
 	}
 	str, ok := data.(string)
