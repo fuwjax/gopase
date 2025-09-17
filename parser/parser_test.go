@@ -1,4 +1,4 @@
-package parser
+package parser_test
 
 import (
 	"iter"
@@ -6,69 +6,58 @@ import (
 	"testing"
 
 	"github.com/fuwjax/gopase/funki"
-	"github.com/fuwjax/gopase/funki/testi"
+	"github.com/fuwjax/gopase/parser"
+	"github.com/fuwjax/gopase/when"
 )
 
 func TestParserBasic(t *testing.T) {
 	t.Run("Parser Basic", func(t *testing.T) {
-		grammar := NewGrammar().AddRule("S", Lit("abc"))
-		parser := BootstrapParser[any]("S", grammar, WrapHandler(nil))
-		result, err := parser("abc")
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, result, "abc")
+		grammar := parser.NewGrammar().AddRule("S", parser.Lit("abc"))
+		parser := parser.BootstrapParser[any]("S", grammar, parser.WrapHandler(nil))
+		when.YouErr(parser("abc")).Expect(t, "abc")
 	})
 }
 func TestParserReuse(t *testing.T) {
 	t.Run("Parser Reuse", func(t *testing.T) {
-		grammar := NewGrammar().AddRule("S", Lit("abc"))
-		parser := BootstrapParser[any]("S", grammar, WrapHandler(nil))
+		grammar := parser.NewGrammar().AddRule("S", parser.Lit("abc"))
+		parser := parser.BootstrapParser[any]("S", grammar, parser.WrapHandler(nil))
 		parser("abc")
-		result, err := parser("abc")
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, result, "abc")
+		when.YouErr(parser("abc")).Expect(t, "abc")
 	})
 }
 func TestParserSequence(t *testing.T) {
 	t.Run("Parser Sequence", func(t *testing.T) {
-		grammar := NewGrammar().AddRule("S", Seq(Lit("a"), Lit("b"), Lit("c")))
-		parser := BootstrapParser[any]("S", grammar, WrapHandler(nil))
-		result, err := parser("abc")
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, result, "abc")
+		grammar := parser.NewGrammar().AddRule("S", parser.Seq(parser.Lit("a"), parser.Lit("b"), parser.Lit("c")))
+		parser := parser.BootstrapParser[any]("S", grammar, parser.WrapHandler(nil))
+		when.YouErr(parser("abc")).Expect(t, "abc")
 	})
 }
 func TestParserRef(t *testing.T) {
 	t.Run("Parser Ref", func(t *testing.T) {
-		grammar := NewGrammar().AddRule("S", Ref("T")).AddRule("T", Lit("abc"))
-		parser := BootstrapParser[any]("S", grammar, WrapHandler(nil))
-		result, err := parser("abc")
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, result, "abc")
+		grammar := parser.NewGrammar().AddRule("S", parser.Ref("T")).AddRule("T", parser.Lit("abc"))
+		parser := parser.BootstrapParser[any]("S", grammar, parser.WrapHandler(nil))
+		when.YouErr(parser("abc")).Expect(t, "abc")
 	})
 }
 func TestParserHandler(t *testing.T) {
 	t.Run("Parser Hander", func(t *testing.T) {
-		handler := make(map[string]Converter)
+		handler := make(map[string]parser.Converter)
 		handler["S"] = func(result iter.Seq2[string, any]) (any, error) {
 			return slices.Collect(funki.Values(funki.FilterKeys(result, "T"))), nil
 		}
-		grammar := NewGrammar().AddRule("S", Ref("T")).AddRule("T", Lit("abc"))
-		parser := BootstrapParser[any]("S", grammar, WrapHandler(handler))
-		result, err := parser("abc")
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, result, []any{"abc"})
+		grammar := parser.NewGrammar().AddRule("S", parser.Ref("T")).AddRule("T", parser.Lit("abc"))
+		parser := parser.BootstrapParser[any]("S", grammar, parser.WrapHandler(handler))
+		when.YouErr(parser("abc")).Expect(t, []any{"abc"})
 	})
 }
 func TestParserHandlerArray(t *testing.T) {
 	t.Run("Parser Hander Array", func(t *testing.T) {
-		handler := make(map[string]Converter)
+		handler := make(map[string]parser.Converter)
 		handler["S"] = func(result iter.Seq2[string, any]) (any, error) {
 			return slices.Collect(funki.Values(funki.FilterKeys(result, "T"))), nil
 		}
-		grammar := NewGrammar().AddRule("S", Seq(Ref("T"), Ref("T"))).AddRule("T", Lit("ab"))
-		parser := BootstrapParser[any]("S", grammar, WrapHandler(handler))
-		result, err := parser("abab")
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, result, []any{"ab", "ab"})
+		grammar := parser.NewGrammar().AddRule("S", parser.Seq(parser.Ref("T"), parser.Ref("T"))).AddRule("T", parser.Lit("ab"))
+		parser := parser.BootstrapParser[any]("S", grammar, parser.WrapHandler(handler))
+		when.YouErr(parser("abab")).Expect(t, []any{"ab", "ab"})
 	})
 }

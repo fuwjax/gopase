@@ -201,3 +201,97 @@ And I really do hope that seeing all these fun little ascii emojis in your templ
 	(^*Bob^).........(^/'s your uncle^) is totally fine. Comments/End tags can be multiline and contain anything other than a ^) or ^ )
 
 Truly, I hope Happy works, for both your templating needs, and your soul.
+
+### Wait, When?
+
+So... one more thing. *testing.T gets super old after a while. Parameterized tests are great and all, but this gets confusing a little too quickly.
+
+    func TestGraphemeNext(t *testing.T) {
+        tests := []struct {
+            name string
+            g    *Grapheme
+            want *Grapheme
+        }{
+            {"Initial Next", &Grapheme{"a", "bc", 1, 1, 1, 2320992, 16}, &Grapheme{"b", "c", 1, 2, 2, 2320992, 16}},
+            {"New Line Next", &Grapheme{"\n", "abc", 1, 1, 1, 2320992, 14}, &Grapheme{"a", "bc", 2, 1, 2, 2320992, 16}},
+        }
+        for _, tt := range tests {
+            t.Run(tt.name, func(t *testing.T) {
+                if got := tt.g.Next(); !reflect.DeepEqual(got, tt.want) {
+                    t.Errorf("Grapheme.Next() = %v, want %v", got, tt.want)
+                }
+            })
+        }
+    }
+
+In a test file full of slight variations to this, it just isn't possible to figure out what functionality is being tested, and what the test case is 
+covering. It also gets complicated to make standard assertions on results, setup and teardown doesn't have a clear place to happen, yeah, just not a fan.
+
+But it's nice to run "go test" whenever, and to have it integrated into the IDE.
+
+I'm sure there are loads of different test patterns out there. But I am trying to learn go, not get lost in the weeds researching competing testing paradigms.
+So I did the only logical thing and created my own.
+
+When is a fairly useful take on an expectation library. Instead of parameterizing tests, you just express the variations. For instance, the above test is now.
+
+    func TestGraphemeNext(t *testing.T) {
+        next := func(g *parser.Grapheme) when.WhenOp[*parser.Grapheme] {
+            return func() *parser.Grapheme {
+                return g.Next()
+            }
+        }
+        when.YouDo("Initial Next", next(parser.NewTestGrapheme("a", "bc", 1, 1, 1, 2320992, 16))).
+            Expect(t, parser.NewTestGrapheme("b", "c", 1, 2, 2, 2320992, 16))
+        when.YouDo("Normal Next", next(parser.NewTestGrapheme("a", "bc", 3, 17, 41, 2320992, 16))).
+            Expect(t, parser.NewTestGrapheme("b", "c", 3, 18, 42, 2320992, 16))
+        when.YouDo("End Next", next(parser.NewTestGrapheme("a", "", 7, 1, 53, 2320992, 16))).
+            Expect(t, parser.NewTestGrapheme("", "", 7, 2, 54, -1, 0))
+        when.YouDo("After End Next", next(parser.NewTestGrapheme("", "", 5, 8, 14, -1, 0))).
+            Expect(t, parser.NewTestGrapheme("", "", 5, 8, 14, -1, 0))
+        when.YouDo("New Line Next", next(parser.NewTestGrapheme("\n", "abc", 1, 1, 1, 2320992, 14))).
+            Expect(t, parser.NewTestGrapheme("a", "bc", 2, 1, 2, 2320992, 16))
+    }
+
+Now at a glance I can see we're trying to exercise "Grapheme.Next()". The inputs are clear (the "&Grapheme" became "parser.NewTestGrapheme" because 
+I didn't want to make private fields public, and I also wanted to be in a "parser_test" package). The expectations are clear. And that holds for even more
+complicated tests like.
+
+	resolve := func(key string, context string) when.WhenOpOk[any] {
+		return func() (any, bool) {
+			key := when.YouErr(happy.ParserFrom()("KeyName", key)).ExpectSuccess(t)
+			contextJson := when.YouErr(sample.ParseJson(context)).ExpectSuccess(t)
+			context := happy.ContextOf(contextJson.([]any)...)
+			return key.(happy.Key).Resolve(context)
+		}
+	}
+	when.YouDoOk("String key", resolve(`"name"`, `[]`)).ExpectMatch(t, MatchJson(`"name"`))
+
+The api is pretty straightforward, in my opinion.
+
+    // t is a *testing.T, doSomething() returns a thing, and something, assuming all went well, equals the thing.
+    when.You(doSomething()).Expect(t, something) 
+
+There are variations on "You", namely "YouErr" and "YouOk" that take a value and an error or boolean respectively. And there are a few variations on "Expect".
+
+    when.You(doSomething()).ExpectSuccess(t)    // fails the test if the result is zero for its type
+    when.YouOk(getIfExists()).ExpectSuccess(t)  // fails the test if the boolean return is false
+    when.YouErr(doOrDie()).ExpectSuccess(t)     // fails the test if the error is not nil
+
+There's also an "ExpectFailure(t)" that just inverts the Success criteria, an "ExpectError(t, message)" that checks that there is in fact an error returned
+and that the ".Error()" on that error matches the message (note this only works for when.YouErr). And finally just in case you want to check for something more
+interesting than success or equals, there's.
+
+    when.YouOk(op()).ExpectMatch(t, SomeMatcher())
+
+where SomeMatcher() here is an example of a when.Matcher. You'll almost certainly want to make use of the when.Assert* assertions in your matchers. See the
+peg_render_test.go in happy/sample for an interesting matcher implementation.
+
+One of the great things about You().Expect() is that it returns the value. The "key :=" line in the resolve function above grabs a parsed key. Failures don't
+abort the test, so you will always get the returned value, though it may not always be useful.
+
+Finally, I found that I spent a lot of time wrapping these You().Expect() calls in a t.Run, so that's where the "when.YouDo" calls come in. They take an executor function
+of the type "when.WhenOp" as well as a name for the test case. They set up the run and execute the op within that run. So anything you might be getting from the test, for 
+instance execution times, will actually be tracking the time for the operation, not just the time for the assertion.
+
+Anyway, if it proves (potentially) useful to folks, I'll document it further. But it was a pleasant diversion before trying to tackle the next thing on my list, which, just
+for the record, is no longer an Earley parser. I have a more ridiculous direction in mind.

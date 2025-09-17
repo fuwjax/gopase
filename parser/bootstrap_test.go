@@ -1,375 +1,84 @@
-package parser
+package parser_test
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/fuwjax/gopase/funki/testi"
+	"github.com/fuwjax/gopase/parser"
+	"github.com/fuwjax/gopase/when"
 )
 
-func TestBootstrapGramamr(t *testing.T) {
-	t.Run("Bootstrap String", func(t *testing.T) {
-		fmt.Println(PegGrammar)
-	})
+func testParse(root, input string) when.WhenOpErr[any] {
+	return func() (any, error) {
+		return parser.BootstrapFrom(root, input)
+	}
 }
 
-func TestBootstrapEof(t *testing.T) {
-	t.Run("Bootstrap EOF", func(t *testing.T) {
-		result, err := Parse("EOF", PegGrammar, PegHandler, "")
-		testi.AssertEqual(t, result, "")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("EOF", PegGrammar, PegHandler, "a")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at 'a' 1:1 (1) expected not something\nwhile in EOF")
-	})
-}
-
-func TestBootstrapEol(t *testing.T) {
-	t.Run("Bootstrap EOL", func(t *testing.T) {
-		result, err := Parse("EOL", PegGrammar, PegHandler, "\n")
-		testi.AssertEqual(t, result, "\n")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("EOL", PegGrammar, PegHandler, "a")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at 'a' 1:1 (1) expected [\\n\\r]\nwhile in EOL")
-	})
-}
-
-func TestBootstrapWs(t *testing.T) {
-	t.Run("Bootstrap WS", func(t *testing.T) {
-		result, err := Parse("WS", PegGrammar, PegHandler, "   ")
-		testi.AssertEqual(t, result, "   ")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("WS", PegGrammar, PegHandler, " a ")
-		testi.AssertEqual(t, result, " ")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("WS", PegGrammar, PegHandler, "a ")
-		testi.AssertEqual(t, result, "")
-		testi.AssertNil(t, err)
-	})
-}
-
-func TestBootstrapName(t *testing.T) {
-	t.Run("Bootstrap Name", func(t *testing.T) {
-		result, err := Parse("Name", PegGrammar, PegHandler, "bob")
-		testi.AssertEqual(t, result, "bob")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Name", PegGrammar, PegHandler, "B0B ross")
-		testi.AssertEqual(t, result, "B0B")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Name", PegGrammar, PegHandler, " bob")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at ' ' 1:1 (1) expected [_a-zA-Z]\nwhile in Name")
-
-		result, err = Parse("Name", PegGrammar, PegHandler, "1234")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at '1' 1:1 (1) expected [_a-zA-Z]\nwhile in Name")
-	})
-}
-
-func TestBootstrapPattern(t *testing.T) {
-	t.Run("Bootstrap Pattern", func(t *testing.T) {
-		result, err := Parse("Pattern", PegGrammar, PegHandler, "[a-z]")
-		testi.AssertEqual(t, result, "[a-z]")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Pattern", PegGrammar, PegHandler, "[\\\"]")
-		testi.AssertEqual(t, result, "[\\\"]")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Pattern", PegGrammar, PegHandler, "[\"]")
-		testi.AssertEqual(t, result, "[\"]")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Pattern", PegGrammar, PegHandler, "[^\\n]")
-		testi.AssertEqual(t, result, "[^\\n]")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Pattern", PegGrammar, PegHandler, "[\"]")
-		testi.AssertEqual(t, result, "[\"]")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Pattern", PegGrammar, PegHandler, "[]]")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at ']' 1:2 (2) expected \\\nat ']' 1:2 (2) expected [^\\]]\nwhile in Pattern")
-
-		result, err = Parse("Pattern", PegGrammar, PegHandler, "1234")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at '1' 1:1 (1) expected [\nwhile in Pattern")
-	})
-}
-
-func TestBootstrapComment(t *testing.T) {
-	t.Run("Bootstrap Comment", func(t *testing.T) {
-		result, err := Parse("Comment", PegGrammar, PegHandler, "#comment")
-		testi.AssertEqual(t, result, "#comment")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Comment", PegGrammar, PegHandler, "#")
-		testi.AssertEqual(t, result, "#")
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Comment", PegGrammar, PegHandler, "not a comment")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at 'n' 1:1 (1) expected #\nwhile in Comment")
-	})
-}
-
-func TestBootstrapRef(t *testing.T) {
-	t.Run("Bootstrap Ref", func(t *testing.T) {
-		result, err := Parse("Ref", PegGrammar, PegHandler, "bob")
-		testi.AssertEqual(t, result, Ref("bob"))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Ref", PegGrammar, PegHandler, "1234")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at '1' 1:1 (1) expected [_a-zA-Z]\nwhile in Name\nwhile in Ref")
-	})
-}
-
-func TestBootstrapCharClass(t *testing.T) {
-	t.Run("Bootstrap CharClass", func(t *testing.T) {
-		result, err := Parse("CharClass", PegGrammar, PegHandler, "[a-z]")
-		testi.AssertEqual(t, result, Cls("[a-z]"))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("CharClass", PegGrammar, PegHandler, "1234")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at '1' 1:1 (1) expected [\nwhile in Pattern\nwhile in CharClass")
-	})
-}
-
-func TestBootstrapLiteral(t *testing.T) {
-	t.Run("Bootstrap Literal", func(t *testing.T) {
-		result, err := Parse("Literal", PegGrammar, PegHandler, "\"hello, world\"")
-		testi.AssertEqual(t, result, Lit("hello, world"))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Literal", PegGrammar, PegHandler, "'hello, world'")
-		testi.AssertEqual(t, result, Lit("hello, world"))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Literal", PegGrammar, PegHandler, "1234")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at '1' 1:1 (1) expected '\nwhile in SingleLit\nat '1' 1:1 (1) expected \"\nwhile in DoubleLit\nwhile in Literal")
-	})
-	t.Run("Bootstrap Backslash Primary", func(t *testing.T) {
-		result, err := Parse("Literal", PegGrammar, PegHandler, `'\\'`)
-		testi.AssertEqual(t, result, Lit(`\`))
-		testi.AssertNil(t, err)
-	})
-}
-
-func TestBootstrapDot(t *testing.T) {
-	t.Run("Bootstrap Dot", func(t *testing.T) {
-		result, err := Parse("Dot", PegGrammar, PegHandler, ".")
-		testi.AssertEqual(t, result, Dot())
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Dot", PegGrammar, PegHandler, "1234")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at '1' 1:1 (1) expected .\nwhile in Dot")
-	})
-}
-
-func TestBootstrapPrimary(t *testing.T) {
-	t.Run("Bootstrap Primary", func(t *testing.T) {
-		result, err := Parse("Primary", PegGrammar, PegHandler, ".")
-		testi.AssertEqual(t, result, Dot())
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Primary", PegGrammar, PegHandler, "\"double\"")
-		testi.AssertEqual(t, result, Lit("double"))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Primary", PegGrammar, PegHandler, "'single'")
-		testi.AssertEqual(t, result, Lit("single"))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Primary", PegGrammar, PegHandler, "[^\"]")
-		testi.AssertEqual(t, result, Cls("[^\"]"))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Primary", PegGrammar, PegHandler, "RefName")
-		testi.AssertEqual(t, result, Ref("RefName"))
-		testi.AssertNil(t, err)
-	})
-}
-
-func TestBootstrapReqExpr(t *testing.T) {
-	t.Run("Bootstrap ReqExpr", func(t *testing.T) {
-		result, err := Parse("ReqExpr", PegGrammar, PegHandler, "[0-9]+")
-		testi.AssertEqual(t, result, Req(Cls("[0-9]")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("ReqExpr", PegGrammar, PegHandler, "'hi'  +")
-		testi.AssertEqual(t, result, Req(Lit("hi")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("ReqExpr", PegGrammar, PegHandler, "Bob")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at EOF 1:4 (4) expected +\nwhile in ReqExpr")
-	})
-}
-
-func TestBootstrapRepExpr(t *testing.T) {
-	t.Run("Bootstrap RepExpr", func(t *testing.T) {
-		result, err := Parse("RepExpr", PegGrammar, PegHandler, "\"yup\"*")
-		testi.AssertEqual(t, result, Rep(Lit("yup")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("RepExpr", PegGrammar, PegHandler, ".  *")
-		testi.AssertEqual(t, result, Rep(Dot()))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("RepExpr", PegGrammar, PegHandler, "Bob")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at EOF 1:4 (4) expected *\nwhile in RepExpr")
-	})
-}
-
-func TestBootstrapOptExpr(t *testing.T) {
-	t.Run("Bootstrap OptExpr", func(t *testing.T) {
-		result, err := Parse("OptExpr", PegGrammar, PegHandler, "RefName?")
-		testi.AssertEqual(t, result, Opt(Ref("RefName")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("OptExpr", PegGrammar, PegHandler, ".  ?")
-		testi.AssertEqual(t, result, Opt(Dot()))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("OptExpr", PegGrammar, PegHandler, "Bob")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at EOF 1:4 (4) expected ?\nwhile in OptExpr")
-	})
-}
-
-func TestBootstrapSuffix(t *testing.T) {
-	t.Run("Bootstrap Suffix", func(t *testing.T) {
-		result, err := Parse("Suffix", PegGrammar, PegHandler, ".+")
-		testi.AssertEqual(t, result, Req(Dot()))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Suffix", PegGrammar, PegHandler, "\"double\" *")
-		testi.AssertEqual(t, result, Rep(Lit("double")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Suffix", PegGrammar, PegHandler, "[^\"]?")
-		testi.AssertEqual(t, result, Opt(Cls("[^\"]")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Suffix", PegGrammar, PegHandler, "Bob")
-		testi.AssertEqual(t, result, Ref("Bob"))
-		testi.AssertNil(t, err)
-	})
-}
-
-func TestBootstrapNotExpr(t *testing.T) {
-	t.Run("Bootstrap NotExpr", func(t *testing.T) {
-		result, err := Parse("NotExpr", PegGrammar, PegHandler, "!RefName")
-		testi.AssertEqual(t, result, Not(Ref("RefName")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("NotExpr", PegGrammar, PegHandler, "!  .  ?")
-		testi.AssertEqual(t, result, Not(Opt(Dot())))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("NotExpr", PegGrammar, PegHandler, "Bob")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at 'B' 1:1 (1) expected !\nwhile in NotExpr")
-	})
-}
-
-func TestBootstrapAndExpr(t *testing.T) {
-	t.Run("Bootstrap AndExpr", func(t *testing.T) {
-		result, err := Parse("AndExpr", PegGrammar, PegHandler, "&RefName")
-		testi.AssertEqual(t, result, See(Ref("RefName")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("AndExpr", PegGrammar, PegHandler, "&  .  ?")
-		testi.AssertEqual(t, result, See(Opt(Dot())))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("AndExpr", PegGrammar, PegHandler, "Bob")
-		testi.AssertNil(t, result)
-		testi.AssertError(t, err, "at 'B' 1:1 (1) expected &\nwhile in AndExpr")
-	})
-}
-
-func TestBootstrapPrefix(t *testing.T) {
-	t.Run("Bootstrap Prefix", func(t *testing.T) {
-		result, err := Parse("Prefix", PegGrammar, PegHandler, "!.")
-		testi.AssertEqual(t, result, Not(Dot()))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Prefix", PegGrammar, PegHandler, "& \"double\" *")
-		testi.AssertEqual(t, result, See(Rep(Lit("double"))))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Prefix", PegGrammar, PegHandler, "[^\"]")
-		testi.AssertEqual(t, result, Cls("[^\"]"))
-		testi.AssertNil(t, err)
-	})
-}
-
-func TestBootstrapSeq(t *testing.T) {
-	t.Run("Bootstrap Seq", func(t *testing.T) {
-		result, err := Parse("Seq", PegGrammar, PegHandler, "A B C")
-		testi.AssertEqual(t, result, Seq(Ref("A"), Ref("B"), Ref("C")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Seq", PegGrammar, PegHandler, ". 'hi' [a-z]")
-		testi.AssertEqual(t, result, Seq(Dot(), Lit("hi"), Cls("[a-z]")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Seq", PegGrammar, PegHandler, "Jim")
-		testi.AssertEqual(t, result, Ref("Jim"))
-		testi.AssertNil(t, err)
-	})
-}
-
-func TestBootstrapExpr(t *testing.T) {
-	t.Run("Bootstrap Expr", func(t *testing.T) {
-		result, err := Parse("Expr", PegGrammar, PegHandler, "A / B / C")
-		testi.AssertEqual(t, result, Alt(Ref("A"), Ref("B"), Ref("C")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Expr", PegGrammar, PegHandler, ". 'hi' / [a-z]")
-		testi.AssertEqual(t, result, Alt(Seq(Dot(), Lit("hi")), Cls("[a-z]")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("Expr", PegGrammar, PegHandler, "Jim")
-		testi.AssertEqual(t, result, Ref("Jim"))
-		testi.AssertNil(t, err)
-	})
-}
-
-func TestBootstrapParExpr(t *testing.T) {
-	t.Run("Bootstrap ParExpr", func(t *testing.T) {
-		result, err := Parse("ParExpr", PegGrammar, PegHandler, "(A B C)")
-		testi.AssertEqual(t, result, Seq(Ref("A"), Ref("B"), Ref("C")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("ParExpr", PegGrammar, PegHandler, "('hi' / [a-z])")
-		testi.AssertEqual(t, result, Alt(Lit("hi"), Cls("[a-z]")))
-		testi.AssertNil(t, err)
-
-		result, err = Parse("ParExpr", PegGrammar, PegHandler, "(Jim)")
-		testi.AssertEqual(t, result, Ref("Jim"))
-		testi.AssertNil(t, err)
-	})
-}
-
-func TestComplicatedExpr(t *testing.T) {
-	t.Run("Bootstrap Complicated", func(t *testing.T) {
-		result, err := Parse("Expr", PegGrammar, PegHandler, `'"' (Plain / "\\u" Hex / "\\" Escape)* '"'`)
-		testi.AssertEqual(t, result, Seq(Lit(`"`), Rep(Alt(Ref("Plain"), Seq(Lit(`\u`), Ref("Hex")), Seq(Lit(`\`), Ref("Escape")))), Lit(`"`)))
-		testi.AssertNil(t, err)
-	})
+func TestBootstrap(t *testing.T) {
+	when.YouDoErr("EOF empty input", testParse("EOF", "")).Expect(t, "")
+	when.YouDoErr("EOF nonempty input", testParse("EOF", "a")).ExpectError(t, "at 'a' 1:1 (1) expected not something\nwhile in EOF")
+	when.YouDoErr("EOL newline", testParse("EOL", "\n")).Expect(t, "\n")
+	when.YouDoErr("EOL non newline", testParse("EOL", "a")).ExpectError(t, "at 'a' 1:1 (1) expected [\\n\\r]\nwhile in EOL")
+	when.YouDoErr("WS spaces", testParse("WS", "   ")).Expect(t, "   ")
+	when.YouDoErr("WS leading space", testParse("WS", " a ")).Expect(t, " ")
+	when.YouDoErr("WS no leading space", testParse("WS", "a ")).Expect(t, "")
+	when.YouDoErr("Name simple", testParse("Name", "bob")).Expect(t, "bob")
+	when.YouDoErr("Name series", testParse("Name", "B0B ross")).Expect(t, "B0B")
+	when.YouDoErr("Name leading space", testParse("Name", " bob")).ExpectError(t, "at ' ' 1:1 (1) expected [_a-zA-Z]\nwhile in Name")
+	when.YouDoErr("Name number", testParse("Name", "1234")).ExpectError(t, "at '1' 1:1 (1) expected [_a-zA-Z]\nwhile in Name")
+	when.YouDoErr("Pattern range", testParse("Pattern", "[a-z]")).Expect(t, "[a-z]")
+	when.YouDoErr("Pattern escape", testParse("Pattern", "[\\\"]")).Expect(t, "[\\\"]")
+	when.YouDoErr("Pattern escape 2", testParse("Pattern", "[\"]")).Expect(t, "[\"]")
+	when.YouDoErr("Pattern negation", testParse("Pattern", "[^\\n]")).Expect(t, "[^\\n]")
+	when.YouDoErr("Pattern missing escape", testParse("Pattern", "[]]")).ExpectError(t, "at ']' 1:2 (2) expected \\\nat ']' 1:2 (2) expected [^\\]]\nwhile in Pattern")
+	when.YouDoErr("Pattern non class", testParse("Pattern", "1234")).ExpectError(t, "at '1' 1:1 (1) expected [\nwhile in Pattern")
+	when.YouDoErr("Comment basic", testParse("Comment", "#comment")).Expect(t, "#comment")
+	when.YouDoErr("Comment empty", testParse("Comment", "#")).Expect(t, "#")
+	when.YouDoErr("Comment basic", testParse("Comment", "not a comment")).ExpectError(t, "at 'n' 1:1 (1) expected #\nwhile in Comment")
+	when.YouDoErr("Ref name", testParse("Ref", "bob")).Expect(t, parser.Ref("bob"))
+	when.YouDoErr("Ref number", testParse("Ref", "1234")).ExpectError(t, "at '1' 1:1 (1) expected [_a-zA-Z]\nwhile in Name\nwhile in Ref")
+	when.YouDoErr("Char Class name", testParse("CharClass", "[a-z]")).Expect(t, parser.Cls("[a-z]"))
+	when.YouDoErr("Char Class number", testParse("CharClass", "1234")).ExpectError(t, "at '1' 1:1 (1) expected [\nwhile in Pattern\nwhile in CharClass")
+	when.YouDoErr("Literal double", testParse("Literal", "\"hello, world\"")).Expect(t, parser.Lit("hello, world"))
+	when.YouDoErr("Literal single", testParse("Literal", "'hello, world'")).Expect(t, parser.Lit("hello, world"))
+	when.YouDoErr("Literal number", testParse("Literal", "1234")).ExpectError(t, "at '1' 1:1 (1) expected '\nwhile in SingleLit\nat '1' 1:1 (1) expected \"\nwhile in DoubleLit\nwhile in Literal")
+	when.YouDoErr("Literal backslash", testParse("Literal", `'\\'`)).Expect(t, parser.Lit(`\`))
+	when.YouDoErr("Dot dot", testParse("Dot", ".")).Expect(t, parser.Dot())
+	when.YouDoErr("Dot not dot", testParse("Dot", "1234")).ExpectError(t, "at '1' 1:1 (1) expected .\nwhile in Dot")
+	when.YouDoErr("Primary dot", testParse("Primary", ".")).Expect(t, parser.Dot())
+	when.YouDoErr("Primary double", testParse("Primary", "\"double\"")).Expect(t, parser.Lit("double"))
+	when.YouDoErr("Primary single", testParse("Primary", "'single'")).Expect(t, parser.Lit("single"))
+	when.YouDoErr("Primary class", testParse("Primary", "[^\"]")).Expect(t, parser.Cls("[^\"]"))
+	when.YouDoErr("Primary ref", testParse("Primary", "RefName")).Expect(t, parser.Ref("RefName"))
+	when.YouDoErr("Required simple", testParse("ReqExpr", "[0-9]+")).Expect(t, parser.Req(parser.Cls("[0-9]")))
+	when.YouDoErr("Required inner space", testParse("ReqExpr", "'hi'  +")).Expect(t, parser.Req(parser.Lit("hi")))
+	when.YouDoErr("Required missing plus", testParse("ReqExpr", "Bob")).ExpectError(t, "at EOF 1:4 (4) expected +\nwhile in ReqExpr")
+	when.YouDoErr("Repeated simple", testParse("RepExpr", "\"yup\"*")).Expect(t, parser.Rep(parser.Lit("yup")))
+	when.YouDoErr("Repeated inner space", testParse("RepExpr", ".  *")).Expect(t, parser.Rep(parser.Dot()))
+	when.YouDoErr("Repeated missing star", testParse("RepExpr", "Bob")).ExpectError(t, "at EOF 1:4 (4) expected *\nwhile in RepExpr")
+	when.YouDoErr("Optional simple", testParse("OptExpr", "RefName?")).Expect(t, parser.Opt(parser.Ref("RefName")))
+	when.YouDoErr("Optional inner space", testParse("OptExpr", ".  ?")).Expect(t, parser.Opt(parser.Dot()))
+	when.YouDoErr("Optional missing question", testParse("OptExpr", "Bob")).ExpectError(t, "at EOF 1:4 (4) expected ?\nwhile in OptExpr")
+	when.YouDoErr("Suffix required", testParse("Suffix", ".+")).Expect(t, parser.Req(parser.Dot()))
+	when.YouDoErr("Suffix repeated", testParse("Suffix", "\"double\" *")).Expect(t, parser.Rep(parser.Lit("double")))
+	when.YouDoErr("Suffix optional", testParse("Suffix", "[^\"]?")).Expect(t, parser.Opt(parser.Cls("[^\"]")))
+	when.YouDoErr("Suffix unadorned", testParse("Suffix", "Bob")).Expect(t, parser.Ref("Bob"))
+	when.YouDoErr("Negative Lookahead simple", testParse("NotExpr", "!RefName")).Expect(t, parser.Not(parser.Ref("RefName")))
+	when.YouDoErr("Negative Lookahead inner space", testParse("NotExpr", "!  .  ?")).Expect(t, parser.Not(parser.Opt(parser.Dot())))
+	when.YouDoErr("Negative Lookahead missing bang", testParse("NotExpr", "Bob")).ExpectError(t, "at 'B' 1:1 (1) expected !\nwhile in NotExpr")
+	when.YouDoErr("Positive Lookahead simple", testParse("AndExpr", "&RefName")).Expect(t, parser.See(parser.Ref("RefName")))
+	when.YouDoErr("Positive Lookahead inner space", testParse("AndExpr", "&  .  ?")).Expect(t, parser.See(parser.Opt(parser.Dot())))
+	when.YouDoErr("Positive Lookahead missing and", testParse("AndExpr", "Bob")).ExpectError(t, "at 'B' 1:1 (1) expected &\nwhile in AndExpr")
+	when.YouDoErr("Prefix not", testParse("Prefix", "!.")).Expect(t, parser.Not(parser.Dot()))
+	when.YouDoErr("Prefix see", testParse("Prefix", "& \"double\" *")).Expect(t, parser.See(parser.Rep(parser.Lit("double"))))
+	when.YouDoErr("Prefix not", testParse("Prefix", "[^\"]")).Expect(t, parser.Cls("[^\"]"))
+	when.YouDoErr("Sequence simple", testParse("Seq", "A B C")).Expect(t, parser.Seq(parser.Ref("A"), parser.Ref("B"), parser.Ref("C")))
+	when.YouDoErr("Sequence stuff", testParse("Seq", ". 'hi' [a-z]")).Expect(t, parser.Seq(parser.Dot(), parser.Lit("hi"), parser.Cls("[a-z]")))
+	when.YouDoErr("Sequence single", testParse("Seq", "Jim")).Expect(t, parser.Ref("Jim"))
+	when.YouDoErr("Alternative simple", testParse("Expr", "A / B / C")).Expect(t, parser.Alt(parser.Ref("A"), parser.Ref("B"), parser.Ref("C")))
+	when.YouDoErr("Alternative stuff", testParse("Expr", ". 'hi' / [a-z]")).Expect(t, parser.Alt(parser.Seq(parser.Dot(), parser.Lit("hi")), parser.Cls("[a-z]")))
+	when.YouDoErr("Alternative single", testParse("Expr", "Jim")).Expect(t, parser.Ref("Jim"))
+	when.YouDoErr("Parens simple", testParse("ParExpr", "(A B C)")).Expect(t, parser.Seq(parser.Ref("A"), parser.Ref("B"), parser.Ref("C")))
+	when.YouDoErr("Parens stuff", testParse("ParExpr", "('hi' / [a-z])")).Expect(t, parser.Alt(parser.Lit("hi"), parser.Cls("[a-z]")))
+	when.YouDoErr("Parens single", testParse("ParExpr", "(Jim)")).Expect(t, parser.Ref("Jim"))
+	when.YouDoErr("JSON bug", testParse("Expr", `'"' (Plain / "\\u" Hex / "\\" Escape)* '"'`)).Expect(t, parser.Seq(parser.Lit(`"`), parser.Rep(parser.Alt(parser.Ref("Plain"), parser.Seq(parser.Lit(`\u`), parser.Ref("Hex")), parser.Seq(parser.Lit(`\`), parser.Ref("Escape")))), parser.Lit(`"`)))
 }

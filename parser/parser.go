@@ -399,6 +399,12 @@ func BootstrapParser[T any](root string, grammar *Grammar, handler Handler) Pars
 	}
 }
 
+func BootstrapParserFrom(grammar *Grammar, handler Handler) ParserFrom {
+	return func(root, input string) (any, error) {
+		return Parse(root, grammar, handler, input)
+	}
+}
+
 /*
 Parses the input according to the root, grammar, and handler.
 */

@@ -1,0 +1,38 @@
+package parser
+
+// copied from sample peg.go and edited (removed "parser." and the import)
+
+func PegGrammar() *Grammar {
+	grammar := NewGrammar()
+	grammar.AddRule("Grammar", Seq(Ref("Line"), Rep(Seq(Ref("EOL"), Ref("Line"))), Opt(Ref("EOL")), Ref("EOF")))
+	grammar.AddRule("Line", Alt(Ref("Rule"), Ref("Comment"), Ref("WS")))
+	grammar.AddRule("Rule", Seq(Ref("WS"), Ref("Name"), Ref("WS"), Lit(`=`), Ref("WS"), Ref("Expr"), Ref("WS")))
+	grammar.AddRule("Expr", Seq(Ref("Seq"), Rep(Seq(Ref("WS"), Lit(`/`), Ref("WS"), Ref("Seq")))))
+	grammar.AddRule("Seq", Seq(Ref("Prefix"), Rep(Seq(Ref("WS"), Ref("Prefix")))))
+	grammar.AddRule("Prefix", Alt(Ref("AndExpr"), Ref("NotExpr"), Ref("Suffix")))
+	grammar.AddRule("AndExpr", Seq(Lit(`&`), Ref("WS"), Ref("Suffix")))
+	grammar.AddRule("NotExpr", Seq(Lit(`!`), Ref("WS"), Ref("Suffix")))
+	grammar.AddRule("Suffix", Alt(Ref("OptExpr"), Ref("RepExpr"), Ref("ReqExpr"), Ref("Primary")))
+	grammar.AddRule("OptExpr", Seq(Ref("Primary"), Ref("WS"), Lit(`?`)))
+	grammar.AddRule("RepExpr", Seq(Ref("Primary"), Ref("WS"), Lit(`*`)))
+	grammar.AddRule("ReqExpr", Seq(Ref("Primary"), Ref("WS"), Lit(`+`)))
+	grammar.AddRule("Primary", Alt(Ref("Dot"), Ref("ParExpr"), Ref("Literal"), Ref("CharClass"), Ref("Ref")))
+	grammar.AddRule("Dot", Lit(`.`))
+	grammar.AddRule("ParExpr", Seq(Lit(`(`), Ref("WS"), Ref("Expr"), Ref("WS"), Lit(`)`)))
+	grammar.AddRule("Literal", Alt(Ref("SingleLit"), Ref("DoubleLit")))
+	grammar.AddRule("CharClass", Ref("Pattern"))
+	grammar.AddRule("Ref", Ref("Name"))
+	grammar.AddRule("Comment", Seq(Lit(`#`), Rep(Seq(Not(Ref("EOL")), Dot()))))
+	grammar.AddRule("Name", Seq(Cls(`[_a-zA-Z]`), Rep(Cls(`[_a-zA-Z0-9]`))))
+	grammar.AddRule("Pattern", Seq(Lit(`[`), Req(Alt(Lit(`\]`), Cls(`[^\]]`))), Lit(`]`)))
+	grammar.AddRule("SingleLit", Seq(Lit(`'`), Rep(Alt(Seq(Lit(`\`), Ref("SingleEscape")), Ref("SinglePlain"))), Lit(`'`)))
+	grammar.AddRule("DoubleLit", Seq(Lit(`"`), Rep(Alt(Seq(Lit(`\`), Ref("DoubleEscape")), Ref("DoublePlain"))), Lit(`"`)))
+	grammar.AddRule("SingleEscape", Cls(`[\\'nrt]`))
+	grammar.AddRule("DoubleEscape", Cls(`[\\"nrt]`))
+	grammar.AddRule("SinglePlain", Req(Cls(`[^\\']`)))
+	grammar.AddRule("DoublePlain", Req(Cls(`[^\\"]`)))
+	grammar.AddRule("WS", Rep(Cls(`[ \t]`)))
+	grammar.AddRule("EOL", Cls(`[\n\r]`))
+	grammar.AddRule("EOF", Not(Dot()))
+	return grammar
+}

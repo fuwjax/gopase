@@ -9,45 +9,11 @@ import (
 )
 
 /*
-The Peg-grammar parser. Bootstrap.Parse() returns a *Grammar.
+The Peg-grammar parser.
 */
-var Bootstrap = BootstrapParser[*Grammar]("Grammar", PegGrammar, PegHandler)
+var Bootstrap = BootstrapParser[*Grammar]("Grammar", PegGrammar(), PegHandler)
 
-var PegGrammar = func() *Grammar {
-	peg := NewGrammar()
-	peg.AddRule("Grammar", Seq(Ref("Line"), Rep(Seq(Ref("EOL"), Ref("Line"))), Opt(Ref("EOL")), Ref("EOF")))
-	peg.AddRule("Line", Alt(Ref("Rule"), Ref("Comment"), Ref("WS")))
-	peg.AddRule("Rule", Seq(Ref("WS"), Ref("Name"), Ref("WS"), Lit("="), Ref("WS"), Ref("Expr"), Ref("WS")))
-	peg.AddRule("Expr", Seq(Ref("Seq"), Rep(Seq(Ref("WS"), Lit("/"), Ref("WS"), Ref("Seq")))))
-	peg.AddRule("Seq", Seq(Ref("Prefix"), Rep(Seq(Ref("WS"), Ref("Prefix")))))
-	peg.AddRule("Prefix", Alt(Ref("AndExpr"), Ref("NotExpr"), Ref("Suffix")))
-	peg.AddRule("AndExpr", Seq(Lit("&"), Ref("WS"), Ref("Suffix")))
-	peg.AddRule("NotExpr", Seq(Lit("!"), Ref("WS"), Ref("Suffix")))
-	peg.AddRule("Suffix", Alt(Ref("OptExpr"), Ref("RepExpr"), Ref("ReqExpr"), Ref("Primary")))
-	peg.AddRule("OptExpr", Seq(Ref("Primary"), Ref("WS"), Lit("?")))
-	peg.AddRule("RepExpr", Seq(Ref("Primary"), Ref("WS"), Lit("*")))
-	peg.AddRule("ReqExpr", Seq(Ref("Primary"), Ref("WS"), Lit("+")))
-	peg.AddRule("Primary", Alt(Ref("Dot"), Ref("ParExpr"), Ref("Literal"), Ref("CharClass"), Ref("Ref")))
-	peg.AddRule("Dot", Lit("."))
-	peg.AddRule("ParExpr", Seq(Lit("("), Ref("WS"), Ref("Expr"), Ref("WS"), Lit(")")))
-	peg.AddRule("Literal", Alt(Ref("SingleLit"), Ref("DoubleLit")))
-	peg.AddRule("CharClass", Ref("Pattern"))
-	peg.AddRule("Ref", Ref("Name"))
-
-	peg.AddRule("Comment", Seq(Lit("#"), Rep(Seq(Not(Ref("EOL")), Dot()))))
-	peg.AddRule("Name", Seq(Cls("[_a-zA-Z]"), Rep(Cls("[_a-zA-Z0-9]"))))
-	peg.AddRule("Pattern", Seq(Lit("["), Req(Alt(Lit(`\]`), Cls(`[^\]]`))), Lit("]")))
-	peg.AddRule("SingleLit", Seq(Lit(`'`), Rep(Alt(Seq(Lit(`\`), Ref("SingleEscape")), Ref("SinglePlain"))), Lit(`'`)))
-	peg.AddRule("DoubleLit", Seq(Lit(`"`), Rep(Alt(Seq(Lit(`\`), Ref("DoubleEscape")), Ref("DoublePlain"))), Lit(`"`)))
-	peg.AddRule("SingleEscape", Cls(`[\\'nrt]`))
-	peg.AddRule("DoubleEscape", Cls(`[\\"nrt]`))
-	peg.AddRule("SinglePlain", Req(Cls(`[^\\']`)))
-	peg.AddRule("DoublePlain", Req(Cls(`[^\\"]`)))
-	peg.AddRule("WS", Rep(Cls(`[ \t]`)))
-	peg.AddRule("EOL", Cls(`[\n\r]`))
-	peg.AddRule("EOF", Not(Dot()))
-	return peg
-}()
+var BootstrapFrom = BootstrapParserFrom(PegGrammar(), PegHandler)
 
 var PegHandler = WrapHandler(pegHandler{})
 

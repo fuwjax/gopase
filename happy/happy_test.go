@@ -5,92 +5,52 @@ import (
 
 	"github.com/fuwjax/gopase/happy"
 	"github.com/fuwjax/gopase/parser/sample"
+	"github.com/fuwjax/gopase/when"
 )
 
 func TestHappyInterpolation(t *testing.T) {
-	tests := []struct {
-		name     string
-		template string
-		data     any
-		expected string
-		err      string
-	}{
-		{"Plaintext", "This is plain text!", nil, "This is plain text!", ""},
-		{"Kitty", "This is (^.^) text!", "kitty", "This is kitty text!", ""},
-		{"Interpolate", "This is (^name^) text!", map[string]any{"name": "Bob"}, "This is Bob text!", ""},
-		{"Strip leading space", `This is 
+	render := func(template string, data any) when.WhenOpErr[string] {
+		return func() (string, error) {
+			return happy.Render(template, data, nil)
+		}
+	}
+	when.YouDoErr("Plaintext", render("This is plain text!", nil)).Expect(t, "This is plain text!")
+	when.YouDoErr("Kitty", render("This is (^.^) text!", "kitty")).Expect(t, "This is kitty text!")
+	when.YouDoErr("Interpolate", render("This is (^name^) text!", map[string]any{"name": "Bob"})).
+		Expect(t, "This is Bob text!")
+	when.YouDoErr("Strip leading space", render(`This is 
 		
-		( ^name^) text!`, map[string]any{"name": "sticky"}, "This issticky text!", ""},
-		{"Strip trailing space", `This is    (^name^ ) text!`, map[string]any{"name": "plain"}, "This is    plaintext!", ""},
-		{"Handle inner whitespace", `This is (^
+		( ^name^) text!`, map[string]any{"name": "sticky"})).Expect(t, "This issticky text!")
+	when.YouDoErr("Strip trailing space", render(`This is    (^name^ ) text!`, map[string]any{"name": "plain"})).
+		Expect(t, "This is    plaintext!")
+	when.YouDoErr("Handle inner whitespace", render(`This is (^
 		name
-		^) text!`, map[string]any{"name": "valid"}, "This is valid text!", ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			results, err := happy.Render(tt.template, tt.data, nil)
-			if err == nil && tt.err != "" {
-				t.Errorf("err was nil, expected %s", tt.err)
-			}
-			if err != nil && tt.err == "" {
-				t.Errorf("err was %e, expected nil", err)
-			}
-			if results != tt.expected {
-				t.Errorf("results was %s, expected %s", results, tt.expected)
-			}
-		})
-	}
+		^) text!`, map[string]any{"name": "valid"})).Expect(t, "This is valid text!")
 }
 
 func TestHappyJsonInterpolation(t *testing.T) {
-	tests := []struct {
-		name     string
-		template string
-		data     string
-		expected string
-		err      string
-	}{
-		{"Simple", `
+	render := func(template string, data string) when.WhenOpErr[string] {
+		return func() (string, error) {
+			json := when.YouErr(sample.ParseJson(data)).ExpectSuccess(t)
+			return happy.Render(template, json, nil)
+		}
+	}
+	when.YouDoErr("Simple", render(`
 		(^name^)
 		(^age^)
-		`, `
-		{"name":"Bob","age":123}
-		`, `
+		`, `{"name":"Bob","age":123}`)).Expect(t, `
 		Bob
 		123
-		`, ""},
-		{"Dotted", `
+		`)
+	when.YouDoErr("Dotted", render(`
 		(^person.name^)
 		(^person.age^)
-		`, `
-		{"person":{"name":"Bob Hope","age":55}}
-		`, `
+		`, `{"person":{"name":"Bob Hope","age":55}}`)).Expect(t, `
 		Bob Hope
 		55
-		`, ""},
-		{"Bracketted", `
+		`)
+	when.YouDoErr("Bracketted", render(`
 		( ^ person[name] ^ )
 		( ^ person[age] ^ )
-		`, `
-		{"person":{"name":"Bob Ross","age":35}}
-		`, `Bob Ross35`, ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			data, err := sample.ParseJson(tt.data)
-			if err != nil {
-				t.Errorf("json parse err was %e, expected nil", err)
-			}
-			results, err := happy.Render(tt.template, data, nil)
-			if err == nil && tt.err != "" {
-				t.Errorf("err was nil, expected %s", tt.err)
-			}
-			if err != nil && tt.err == "" {
-				t.Errorf("err was %e, expected nil", err)
-			}
-			if results != tt.expected {
-				t.Errorf("results was %s, expected %s", results, tt.expected)
-			}
-		})
-	}
+		`, `{"person":{"name":"Bob Ross","age":35}}`)).Expect(t, `Bob Ross35`)
 }

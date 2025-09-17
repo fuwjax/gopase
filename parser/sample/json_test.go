@@ -1,56 +1,28 @@
-package sample
+package sample_test
 
 import (
 	"testing"
 
-	"github.com/fuwjax/gopase/funki/testi"
+	"github.com/fuwjax/gopase/parser/sample"
+	"github.com/fuwjax/gopase/when"
 )
 
-func TestJsonString(t *testing.T) {
-	t.Run("Json String", func(t *testing.T) {
-		results, err := ParseJson(`"abcd"`)
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, results, "abcd")
-	})
-	t.Run("Json Escape", func(t *testing.T) {
-		results, err := ParseJsonFrom("String", `"\n"`)
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, results, "\n")
-	})
-}
-
-func TestJsonNumber(t *testing.T) {
-	t.Run("Json Number", func(t *testing.T) {
-		results, err := ParseJson(`3.4`)
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, results, 3.4)
-	})
-}
-
-func TestJsonArray(t *testing.T) {
-	t.Run("Json Array", func(t *testing.T) {
-		results, err := ParseJson(`[1,2,3.4]`)
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, results, []any{1.0, 2.0, 3.4})
-	})
-}
-
-func TestJsonObject(t *testing.T) {
-	t.Run("Json Object", func(t *testing.T) {
-		results, err := ParseJson(`{"A":"a","B":"b","C":"c"}`)
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, results, map[string]any{"A": "a", "B": "b", "C": "c"})
-	})
-}
-
-func TestJsonMultilineObject(t *testing.T) {
-	t.Run("Json Multiline Object", func(t *testing.T) {
-		results, err := ParseJson(`{
+func TestJson(t *testing.T) {
+	// parseJson := input -> () -> sample.ParseJson(input)
+	parseJson := func(input string) func() (any, error) {
+		return func() (any, error) {
+			return sample.ParseJson(input)
+		}
+	}
+	when.YouDoErr("Json String", parseJson(`"abcd"`)).Expect(t, "abcd")
+	when.YouDoErr("Json Escape", parseJson(`"\n"`)).Expect(t, "\n")
+	when.YouDoErr("Json Number", parseJson(`3.4`)).Expect(t, 3.4)
+	when.YouDoErr("Json Array", parseJson(`[1,2,3.4]`)).Expect(t, []any{1.0, 2.0, 3.4})
+	when.YouDoErr("Json Object", parseJson(`{"A":"a","B":"b","C":"c"}`)).
+		Expect(t, map[string]any{"A": "a", "B": "b", "C": "c"})
+	when.YouDoErr("Json Multiline Object", parseJson(`{
 			"A": "a",
 			"B": "b",
 			"C": "c"
-		}`)
-		testi.AssertNil(t, err)
-		testi.AssertEqual(t, results, map[string]any{"A": "a", "B": "b", "C": "c"})
-	})
+		}`)).Expect(t, map[string]any{"A": "a", "B": "b", "C": "c"})
 }

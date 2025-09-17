@@ -11,6 +11,10 @@ type Grapheme struct {
 	Line, Column, Pos, state, boundaries int
 }
 
+func NewTestGrapheme(t, r string, l, c, p, s, b int) *Grapheme {
+	return &Grapheme{t, r, l, c, p, s, b}
+}
+
 func NewGrapheme(str string) *Grapheme {
 	return (&Grapheme{"", str, 1, 0, 0, -1, 0}).Next()
 }

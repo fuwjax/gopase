@@ -6,6 +6,7 @@ import (
 
 	"github.com/fuwjax/gopase/happy"
 	"github.com/fuwjax/gopase/parser/sample"
+	"github.com/fuwjax/gopase/when"
 )
 
 func checkError(t *testing.T, err error, format string, arg any) {
@@ -14,76 +15,51 @@ func checkError(t *testing.T, err error, format string, arg any) {
 	}
 }
 
-func TestKeyResolve(t *testing.T) {
-	tests := []struct {
-		name     string
-		key      string
-		context  string
-		expected string
-		ok       bool
-	}{
-		{"String key", `"name"`, `[]`, `"name"`, true},
-		{"String key ignores context", `"name"`, `[{"name":"Bob"}]`, `"name"`, true},
-		{"Plain key uses context", `name`, `[{"name":"Bob"}]`, `"Bob"`, true},
-		{"Plain key fails without context", `name`, `[{"first_name":"Bob"}]`, `null`, false},
-		{"Plain key uses latest context", `name`, `[{"name":"Bob"},{"name":"Jim"}]`, `"Jim"`, true},
-		{"Plain key travels context", `name`, `[{"name":"Bob"},{"first_name":"Jim"}]`, `"Bob"`, true},
-		{"Dot returns context", `.`, `[{"name":"Bob"}]`, `{"name":"Bob"}`, true},
-		{"Dotted uses nested context", `person.name`, `[{"person":{"name":"Bob"}}]`, `"Bob"`, true},
-		{"Brackets uses nested context", `person["name"]`, `[{"person":{"name":"Bob"}}]`, `"Bob"`, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			key, err := happy.ParserFrom()("KeyName", tt.key)
-			checkError(t, err, "could not parse %s into key", tt.key)
-			contextJson, err := sample.ParseJson(tt.context)
-			checkError(t, err, "could not parse %s into json", tt.context)
-			expected, err := sample.ParseJson(tt.expected)
-			checkError(t, err, "could not parse %s into json", tt.expected)
-
-			context := happy.ContextOf(contextJson.([]any)...)
-			actual, ok := key.(happy.Key).Resolve(context)
-			if ok != tt.ok {
-				t.Errorf("ok was %t, expected %t", ok, tt.ok)
-			}
-			if !reflect.DeepEqual(actual, expected) {
-				t.Errorf("actual was %s, expected %s", actual, expected)
-			}
-		})
+func MatchJson(expected string) when.Matcher[any] {
+	return func(t *testing.T, actual any) {
+		json := when.YouErr(sample.ParseJson(expected)).ExpectSuccess(t)
+		when.AssertEqual(t, actual, json)
 	}
 }
 
-func TestKeyResolveName(t *testing.T) {
-	tests := []struct {
-		name     string
-		key      string
-		context  string
-		expected string
-	}{
-		{"String key", `"name"`, `[]`, "name"},
-		{"String key ignores context", `"name"`, `[{"name":"Bob"}]`, "name"},
-		{"Plain key uses context", `name`, `[{"name":"Bob"}]`, "Bob"},
-		{"Plain key reverts to literal without context", `name`, `[{"first_name":"Bob"}]`, "name"},
-		{"Plain key uses latest context", `name`, `[{"name":"Bob"},{"name":"Jim"}]`, "Jim"},
-		{"Plain key travels context", `name`, `[{"name":"Bob"},{"first_name":"Jim"}]`, "Bob"},
-		{"Dot returns String() of current context", `.`, `[{"name":"Bob"}]`, "map[name:Bob]"},
-		{"Dotted uses nested context", `person.name`, `[{"person":{"name":"Bob"}}]`, "Bob"},
-		{"Brackets uses nested context", `person["name"]`, `[{"person":{"name":"Bob"}}]`, "Bob"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			key, err := happy.ParserFrom()("KeyName", tt.key)
-			checkError(t, err, "could not parse %s into key", tt.key)
-			contextJson, err := sample.ParseJson(tt.context)
-			checkError(t, err, "could not parse %s into json", tt.context)
-
+func TestKeyResolve(t *testing.T) {
+	resolve := func(key string, context string) when.WhenOpOk[any] {
+		return func() (any, bool) {
+			key := when.YouErr(happy.ParserFrom()("KeyName", key)).ExpectSuccess(t)
+			contextJson := when.YouErr(sample.ParseJson(context)).ExpectSuccess(t)
 			context := happy.ContextOf(contextJson.([]any)...)
-			actual := happy.ResolveName(key.(happy.Key), context)
-			if !reflect.DeepEqual(actual, tt.expected) {
-				t.Errorf("actual was %s, expected %s", actual, tt.expected)
-			}
-		})
+			return key.(happy.Key).Resolve(context)
+		}
 	}
+	when.YouDoOk("String key", resolve(`"name"`, `[]`)).ExpectMatch(t, MatchJson(`"name"`))
+	when.YouDoOk("String key ignores context", resolve(`"name"`, `[{"name":"Bob"}]`)).ExpectMatch(t, MatchJson(`"name"`))
+	when.YouDoOk("Plain key uses context", resolve(`name`, `[{"name":"Bob"}]`)).ExpectMatch(t, MatchJson(`"Bob"`))
+	when.YouDoOk("Plain key fails without context", resolve(`name`, `[{"first_name":"Bob"}]`)).ExpectFailure(t)
+	when.YouDoOk("Plain key uses latest context", resolve(`name`, `[{"name":"Bob"},{"name":"Jim"}]`)).ExpectMatch(t, MatchJson(`"Jim"`))
+	when.YouDoOk("Plain key travels context", resolve(`name`, `[{"name":"Bob"},{"first_name":"Jim"}]`)).ExpectMatch(t, MatchJson(`"Bob"`))
+	when.YouDoOk("Dot returns context", resolve(`.`, `[{"name":"Bob"}]`)).ExpectMatch(t, MatchJson(`{"name":"Bob"}`))
+	when.YouDoOk("Dotted uses nested context", resolve(`person.name`, `[{"person":{"name":"Bob"}}]`)).ExpectMatch(t, MatchJson(`"Bob"`))
+	when.YouDoOk("Brackets uses nested context", resolve(`person["name"]`, `[{"person":{"name":"Bob"}}]`)).ExpectMatch(t, MatchJson(`"Bob"`))
+}
+
+func TestKeyResolveName(t *testing.T) {
+	resolveName := func(tag string, data string) when.WhenOp[string] {
+		return func() string {
+			key := when.YouErr(happy.ParserFrom()("KeyName", tag)).ExpectSuccess(t)
+			contextJson := when.YouErr(sample.ParseJson(data)).ExpectSuccess(t)
+			context := happy.ContextOf(contextJson.([]any)...)
+			return happy.ResolveName(key.(happy.Key), context)
+		}
+	}
+	when.YouDo("String key", resolveName(`"name"`, `[]`)).Expect(t, "name")
+	when.YouDo("String key ignores context", resolveName(`"name"`, `[{"name":"Bob"}]`)).Expect(t, "name")
+	when.YouDo("Plain key uses context", resolveName(`name`, `[{"name":"Bob"}]`)).Expect(t, "Bob")
+	when.YouDo("Plain key reverts to literal without context", resolveName(`name`, `[{"first_name":"Bob"}]`)).Expect(t, "name")
+	when.YouDo("Plain key uses latest context", resolveName(`name`, `[{"name":"Bob"},{"name":"Jim"}]`)).Expect(t, "Jim")
+	when.YouDo("Plain key travels context", resolveName(`name`, `[{"name":"Bob"},{"first_name":"Jim"}]`)).Expect(t, "Bob")
+	when.YouDo("Dot returns String() of current context", resolveName(`.`, `[{"name":"Bob"}]`)).Expect(t, "map[name:Bob]")
+	when.YouDo("Dotted uses nested context", resolveName(`person.name`, `[{"person":{"name":"Bob"}}]`)).Expect(t, "Bob")
+	when.YouDo("Brackets uses nested context", resolveName(`person["name"]`, `[{"person":{"name":"Bob"}}]`)).Expect(t, "Bob")
 }
 
 func TestKeyWithInterestingContext(t *testing.T) {
@@ -91,43 +67,32 @@ func TestKeyWithInterestingContext(t *testing.T) {
 		Name string
 		Age  int
 	}
-	context := []any{
+	context := happy.ContextOf(
 		map[string]any{
 			"people": []Person{{"Bob", 123}, {"Jim", 456}},
 			"type":   func(data any) string { return reflect.TypeOf(data).Elem().Name() },
 			"cities": map[string]string{"Europe": "Antwerp", "NorthAmerica": "Chicago"},
 		},
-		&Person{"Jim", 456},
+		&Person{"Jim", 456})
+	resolve := func(key string) when.WhenOpOk[any] {
+		return func() (any, bool) {
+			key := when.YouErr(happy.ParserFrom()("KeyName", key)).ExpectSuccess(t)
+			return key.(happy.Key).Resolve(context)
+		}
 	}
-	tests := []struct {
-		name         string
-		key          string
-		expected     any
-		ok           bool
-		expectedName string
-	}{
-		{"At key returns index", `@`, 1, true, "1"},
-		{"String key doesn't split on dots", `"people.0"`, "people.0", true, "people.0"},
-		{"Function resolves up", `type[.]`, reflect.TypeFor[*Person]().Elem().Name(), true, "Person"},
+	resolveName := func(tag string) when.WhenOp[string] {
+		return func() string {
+			key := when.YouErr(happy.ParserFrom()("KeyName", tag)).ExpectSuccess(t)
+			return happy.ResolveName(key.(happy.Key), context)
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			key, err := happy.ParserFrom()("KeyName", tt.key)
-			checkError(t, err, "could not parse %s into key", tt.key)
 
-			context := happy.ContextOf(context...)
-			actual, ok := key.(happy.Key).Resolve(context)
-			actualName := happy.ResolveName(key.(happy.Key), context)
+	when.YouDoOk("At key returns index", resolve(`@`)).Expect(t, 1)
+	when.YouDo("At key returns index", resolveName(`@`)).Expect(t, "1")
 
-			if ok != tt.ok {
-				t.Errorf("ok was %t, expected %t", ok, tt.ok)
-			}
-			if !reflect.DeepEqual(actual, tt.expected) {
-				t.Errorf("actual was %s, expected %s", actual, tt.expected)
-			}
-			if !reflect.DeepEqual(actualName, tt.expectedName) {
-				t.Errorf("actualName was %s, expected %s", actualName, tt.expectedName)
-			}
-		})
-	}
+	when.YouDoOk("String key doesn't split on dots", resolve(`"people.0"`)).Expect(t, "people.0")
+	when.YouDo("String key doesn't split on dots", resolveName(`"people.0"`)).Expect(t, "people.0")
+
+	when.YouDoOk("Function resolves up", resolve(`type[.]`)).Expect(t, reflect.TypeFor[*Person]().Elem().Name())
+	when.YouDo("Function resolves up", resolveName(`type[.]`)).Expect(t, "Person")
 }
