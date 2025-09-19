@@ -5,20 +5,14 @@ import (
 	"testing"
 
 	"github.com/fuwjax/gopase/happy"
-	"github.com/fuwjax/gopase/parser/sample"
+	"github.com/fuwjax/gopase/sample"
 	"github.com/fuwjax/gopase/when"
 )
 
-func checkError(t *testing.T, err error, format string, arg any) {
-	if err != nil {
-		t.Errorf(format, err, arg)
-	}
-}
-
 func MatchJson(expected string) when.Matcher[any] {
-	return func(t *testing.T, actual any) {
+	return func(t *testing.T, actual any) bool {
 		json := when.YouErr(sample.ParseJson(expected)).ExpectSuccess(t)
-		when.AssertEqual(t, actual, json)
+		return when.AssertEqual(t, actual, json)
 	}
 }
 

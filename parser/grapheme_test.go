@@ -108,6 +108,7 @@ func TestGraphemes(t *testing.T) {
 		}
 	}
 	when.YouDo("Normal Graphemes", graphemes("a\nb\\'c")).ExpectMatch(t, when.MatchSeq(
+		when.AssertEqual,
 		parser.NewTestGrapheme("a", "\nb\\'c", 1, 1, 1, 8414242, 20),
 		parser.NewTestGrapheme("\n", "b\\'c", 1, 2, 2, 2320992, 14),
 		parser.NewTestGrapheme("b", "\\'c", 2, 1, 3, 2334720, 20),

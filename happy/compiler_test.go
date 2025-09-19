@@ -42,8 +42,8 @@ func TestCompileTags(t *testing.T) {
 		Expect(t, &happy.Reference{happy.Bracket("name")})
 	when.YouDoErr("Value consumes ws", parseTag(`    ( ^name^ )      `)).
 		Expect(t, &happy.Reference{happy.Bracket("name")})
-	when.YouDoErr("Else", parseTag(`(^!name^)`)).
-		Expect(t, &happy.Reference{happy.Invert(happy.Bracket("name"))})
+	when.YouDoErr("Else", parseTag(`(^!name^)miss you!(^/^)`)).
+		Expect(t, &happy.Invert{happy.Bracket("name"), &happy.Template{[]happy.Renderer{&happy.Plaintext{"miss you!"}}}})
 	when.YouDoErr("Include", parseTag(`(^>name^)`)).
 		Expect(t, &happy.Include{happy.Bracket("name")})
 }

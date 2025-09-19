@@ -14,13 +14,13 @@ import (
 const happyGrammar = `
 Template = Content EOF
 Content = (Plain? Tag)* Plain?
-Tag = Open (Comment / Value / Else / Include / Section / Partial / Override) Close
+Tag = Open (Comment / Value / Include / Section / Else / Partial / Override) Close
 
 Comment = '#' Text?
 Value = Key
-Else = '!' Key
 Include = '>' KeyName
 Section = '*' Key Close Content Open '/' Text?
+Else = '!' Key Close Content Open '/' Text?
 Partial = '=' KeyName Close Content Open '/' Text?
 Override = '>>' KeyName Close Content Open '/' Text?
 
@@ -101,11 +101,6 @@ func (h happyHandler) Value(results iter.Seq2[string, any]) (any, error) {
 	return &Reference{value.(Key)}, nil
 }
 
-func (h happyHandler) Else(results iter.Seq2[string, any]) (any, error) {
-	_, value := funki.FirstOf(results, "Key")
-	return &Reference{Invert(value.(Key))}, nil
-}
-
 func (h happyHandler) Include(results iter.Seq2[string, any]) (any, error) {
 	_, value := funki.FirstOf(results, "KeyName")
 	return &Include{value.(Key)}, nil
@@ -115,6 +110,12 @@ func (h happyHandler) Section(results iter.Seq2[string, any]) (any, error) {
 	_, value := funki.FirstOf(results, "Key")
 	_, content := funki.FirstOf(results, "Content")
 	return &Section{value.(Key), content.(*Template)}, nil
+}
+
+func (h happyHandler) Else(results iter.Seq2[string, any]) (any, error) {
+	_, value := funki.FirstOf(results, "Key")
+	_, content := funki.FirstOf(results, "Content")
+	return &Invert{value.(Key), content.(*Template)}, nil
 }
 
 func (h happyHandler) Partial(results iter.Seq2[string, any]) (any, error) {

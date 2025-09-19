@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	template "github.com/fuwjax/gopase/happy/sample"
 	"github.com/fuwjax/gopase/parser"
-	json "github.com/fuwjax/gopase/parser/sample"
+	"github.com/fuwjax/gopase/sample"
 )
 
 func panicUnless[T any](t T, err error) T {
@@ -24,8 +23,8 @@ func main() {
 	grammarPath := flag.Arg(0)
 	config := panicUnless(os.ReadFile(configPath))
 	grammar := panicUnless(os.ReadFile(grammarPath))
-	opts := panicUnless(json.ParseJson(string(config))).(map[string]any)
+	opts := panicUnless(sample.ParseJson(string(config))).(map[string]any)
 	rules := panicUnless(parser.Bootstrap(string(grammar)))
-	result := panicUnless(template.RenderPeg(rules, opts))
+	result := panicUnless(sample.RenderPeg(rules, opts))
 	fmt.Print(result)
 }

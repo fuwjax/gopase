@@ -1,0 +1,29 @@
+Template = Content EOF
+Content = (Plain? Tag)* Plain?
+Tag = Open (Comment / Value / Include / Section / Else / Partial / Override) Close
+
+Comment = '#' Text?
+Value = Key
+Include = '>' KeyName
+Section = '*' Key Close Content Open '/' Text?
+Else = '!' Key Close Content Open '/' Text?
+Partial = '=' KeyName Close Content Open '/' Text?
+Override = '>>' KeyName Close Content Open '/' Text?
+
+Text = (!Close .)+
+KeyName = Key / Name
+Name = WS '"' String '"' WS
+String = (Escape / Chs)*
+Chs = [^"]+
+Escape = '""'
+Key = WS (Bracket ('.' Bracket)* / Dot / At) WS
+Dot = '.'
+# it would be more fun if (^-^) were the index/map key/field name in a section
+At = '@'
+Bracket = Ident ('[' KeyName ']')*
+Ident = [_a-zA-Z0-9]+
+Plain = (!Open .)+
+Open = '(^' / WS '( ^'
+Close = '^)' / '^ )' WS
+WS = [ \t\r\n]*
+EOF = !.

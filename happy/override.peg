@@ -1,0 +1,10 @@
+Override = (WS Entry WS)* EOF
+Entry = Open Name Close Content Open '/' Text Close
+Content = (Plain Entry)* Plain
+Open = '[^' / WS '[ ^'
+Close = '^]' / '^ ]' WS
+Plain = (!Open .)*
+Name = Ident ('.' Ident)*
+Ident = [_a-zA-Z0-9]+
+WS = [ \t\r\n]*
+EOF = !.

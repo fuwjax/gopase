@@ -82,6 +82,19 @@ func (s *Section) Render(context *Context, partials map[string]*Template) (strin
 	return sb.String(), nil
 }
 
+type Invert struct {
+	Name    Key
+	Content *Template
+}
+
+func (s *Invert) Render(context *Context, partials map[string]*Template) (string, error) {
+	data, ok := s.Name.Resolve(context)
+	if ok && Truthy(data) {
+		return "", nil
+	}
+	return s.Content.Render(context, partials)
+}
+
 type Reference struct {
 	Name Key
 }

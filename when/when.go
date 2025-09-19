@@ -4,7 +4,13 @@ import (
 	"testing"
 )
 
-type Matcher[T any] func(t *testing.T, actual T)
+type Assertion[T any] func(t *testing.T, actual, expected T) bool
+
+/*
+Matcher is a partial Assertion. It encapsulates the logic to determine the expected
+result rather than the actual expected instance.
+*/
+type Matcher[T any] func(t *testing.T, actual T) bool
 
 type Expectation[T any] interface {
 	Expect(t *testing.T, expected T) T
@@ -87,8 +93,8 @@ type errorEx[T any] struct {
 }
 
 func (e *errorEx[T]) Expect(t *testing.T, expected T) T {
-	AssertEqual(t, e.actual, expected)
 	AssertNil(t, e.actualErr)
+	AssertEqual(t, e.actual, expected)
 	return e.actual
 }
 
@@ -119,8 +125,8 @@ type boolEx[T any] struct {
 }
 
 func (e *boolEx[T]) Expect(t *testing.T, expected T) T {
-	AssertEqual(t, e.actual, expected)
 	AssertTrue(t, e.actualOk)
+	AssertEqual(t, e.actual, expected)
 	return e.actual
 }
 

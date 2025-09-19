@@ -1,7 +1,6 @@
 package happy
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/fuwjax/gopase/funki"
@@ -22,10 +21,6 @@ func ResolveName(key Key, context *Context) string {
 		return name
 	}
 	return ""
-}
-
-func Invert(key Key) Key {
-	return InvertKey{key}
 }
 
 func Dot() Key {
@@ -52,22 +47,6 @@ func Bracket(name string, keys ...Key) Key {
 		keys = nil
 	}
 	return BracketKey{name, keys}
-}
-
-type InvertKey struct {
-	key Key
-}
-
-func (invert InvertKey) Resolve(context *Context) (any, bool) {
-	result, ok := invert.key.Resolve(context)
-	if !ok || !Truthy(result) {
-		return nil, true
-	}
-	return nil, false
-}
-
-func (invert InvertKey) String() string {
-	return fmt.Sprintf("!%s", invert.key)
 }
 
 type LiteralKey struct {

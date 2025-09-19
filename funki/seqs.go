@@ -13,10 +13,16 @@ func FirstOf[K comparable, T any](i iter.Seq2[K, T], keys ...K) (K, T) {
 	return First(FilterKeys(i, keys...))
 }
 
+/*
+Filters and casts the values whose keys are in the argument list.
+*/
 func ListOf[T any](i iter.Seq2[string, any], keys ...string) []T {
 	return slices.Collect(Cast[T](Values(FilterKeys(i, keys...))))
 }
 
+/*
+Returns the first pair from the iter.Seq2, or the zero-zero pair if the sequence is empty.
+*/
 func First[K any, T any](i iter.Seq2[K, T]) (K, T) {
 	for k, t := range i {
 		return k, t
@@ -26,6 +32,10 @@ func First[K any, T any](i iter.Seq2[K, T]) (K, T) {
 	return k, t
 }
 
+/*
+Filters iter.Seq2 based on the first half, only pairs with the first half present in the
+list of keys will be passed on.
+*/
 func FilterKeys[K comparable, T any](i iter.Seq2[K, T], keys ...K) iter.Seq2[K, T] {
 	return func(yield func(K, T) bool) {
 		i(func(k K, t T) bool {
@@ -37,6 +47,9 @@ func FilterKeys[K comparable, T any](i iter.Seq2[K, T], keys ...K) iter.Seq2[K, 
 	}
 }
 
+/*
+Filters out nil values from an iter.Seq.
+*/
 func FilterNonNil[T comparable](i iter.Seq[T]) iter.Seq[T] {
 	var zero T
 	return func(yield func(T) bool) {
@@ -49,6 +62,9 @@ func FilterNonNil[T comparable](i iter.Seq[T]) iter.Seq[T] {
 	}
 }
 
+/*
+Returns a iter.Seq of the second half of the iter.Seq2.
+*/
 func Values[K, T any](i iter.Seq2[K, T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		i(func(k K, t T) bool {
@@ -57,6 +73,10 @@ func Values[K, T any](i iter.Seq2[K, T]) iter.Seq[T] {
 	}
 }
 
+// This is antithetical to the prefered ways of go: using generic types for empty casts.
+/*
+Returns a iter.Seq cast to the generic type.
+*/
 func Cast[T any](i iter.Seq[any]) iter.Seq[T] {
 	var zero T
 	return func(yield func(T) bool) {

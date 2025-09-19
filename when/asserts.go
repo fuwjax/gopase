@@ -1,6 +1,7 @@
 package when
 
 import (
+	"iter"
 	"reflect"
 	"testing"
 )
@@ -8,17 +9,12 @@ import (
 /*
 Asserts the actual value is deeply equal to the expected value.
 */
-func AssertEqual(t *testing.T, actual, expected any) bool {
-	if expected == nil {
-		return AssertNil(t, actual)
-	} else if actual == nil {
-		t.Errorf("actual nil, expected %v", expected)
-	} else if !reflect.DeepEqual(actual, expected) {
+func AssertEqual[T any](t *testing.T, actual, expected T) bool {
+	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("actual %v, expected %v", actual, expected)
-	} else {
-		return true
+		return false
 	}
-	return false
+	return true
 }
 
 /*
@@ -51,7 +47,7 @@ func AssertError(t *testing.T, actual error, expected string) bool {
 func AssertNonZero[T any](t *testing.T, actual T) bool {
 	var zero T
 	if reflect.DeepEqual(actual, zero) {
-		t.Errorf("actual %v, expected non-zero", actual)
+		t.Errorf("actual %v, expected non-%v", actual, zero)
 		return false
 	}
 	return true
@@ -60,7 +56,7 @@ func AssertNonZero[T any](t *testing.T, actual T) bool {
 func AssertZero[T any](t *testing.T, actual T) bool {
 	var zero T
 	if !reflect.DeepEqual(actual, zero) {
-		t.Errorf("actual %v, expected zero", actual)
+		t.Errorf("actual %v, expected %v", actual, zero)
 		return false
 	}
 	return true
@@ -80,14 +76,10 @@ func AssertTrue(t *testing.T, actual bool) bool {
 	return actual
 }
 
-func AssertSlices[T ~[]E, E any](t *testing.T, actual, expected T) bool {
-	for i, a := range actual {
-		if i > len(expected) {
-			t.Errorf("actual %v, expected EOF", a)
-		}
-		if !AssertEqual(t, a, expected[i]) {
-			return false
-		}
-	}
-	return AssertEqual(t, len(actual), len(expected))
+func AssertSlice[T ~[]E, E any](t *testing.T, actual, expected T) bool {
+	return MatchSlice(AssertEqual, expected)(t, actual)
+}
+
+func AssertSeq[T any](t *testing.T, actual iter.Seq[T], expected []T) bool {
+	return MatchSeq(AssertEqual, expected...)(t, actual)
 }

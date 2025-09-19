@@ -3,7 +3,7 @@ package sample_test
 import (
 	"testing"
 
-	"github.com/fuwjax/gopase/parser/sample"
+	"github.com/fuwjax/gopase/sample"
 	"github.com/fuwjax/gopase/when"
 )
 
