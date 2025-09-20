@@ -93,7 +93,7 @@ func (dot *dottedKey) Resolve(context Context) (any, bool) {
 		if !ok || data == nil {
 			return nil, false
 		}
-		context = context.With(nil, data)
+		context = ContextOf(nil, data)
 	}
 	return context.GetData(), true
 }
