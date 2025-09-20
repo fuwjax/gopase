@@ -71,7 +71,7 @@ func AssertFalse(t *testing.T, actual bool) bool {
 
 func AssertTrue(t *testing.T, actual bool) bool {
 	if !actual {
-		t.Errorf("actual %v, expected false", actual)
+		t.Errorf("actual %v, expected true", actual)
 	}
 	return actual
 }

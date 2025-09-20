@@ -38,7 +38,7 @@ func (^name^)Grammar() *(^>parser^)Grammar {
 }
 `
 
-var PegTemplate = sync.OnceValues(func() (*happy.Template, error) {
+var PegTemplate = sync.OnceValues(func() (happy.Template, error) {
 	return happy.Compile(template)
 })
 

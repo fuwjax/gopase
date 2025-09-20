@@ -5,7 +5,11 @@ import (
 	"strings"
 )
 
-func Render(template string, data any, partials map[string]*Template) (string, error) {
+//Partials and data may be nil, but it'll be a pretty boring render.
+/*
+Renders data against a template with supporting partials.
+*/
+func Render(template string, data any, partials map[string]Template) (string, error) {
 	comp, err := Compile(template)
 	if err != nil {
 		return "", err
@@ -13,38 +17,48 @@ func Render(template string, data any, partials map[string]*Template) (string, e
 	return comp.Render(ContextOf(data), partials)
 }
 
-type Context struct {
-	Index any
-	Data  any
-	Next  *Context
+type Template interface {
+	Render(context Context, partials map[string]Template) (string, error)
 }
 
-func ContextOf(data ...any) *Context {
-	var c *Context
-	for i, d := range data {
-		c = c.With(i, d)
-	}
-	return c
+func Content(content []Template) Template {
+	return &template{content}
 }
 
-func (c *Context) With(index, data any) *Context {
-	return &Context{index, data, c}
+func Section(name Key, content Template) Template {
+	return &section{name, content}
 }
 
-type Renderer interface {
-	Render(context *Context, partials map[string]*Template) (string, error)
+func Invert(name Key, content Template) Template {
+	return &invert{name, content}
 }
 
-type Template struct {
-	Content []Renderer
+func Reference(name Key) Template {
+	return &reference{name}
 }
 
-func (t *Template) Render(context *Context, partials map[string]*Template) (string, error) {
+func Plaintext(text string) Template {
+	return &plaintext{text}
+}
+
+func Include(name Key) Template {
+	return &include{name}
+}
+
+func Partial(name Key, content Template) Template {
+	return &partial{name, content}
+}
+
+type template struct {
+	content []Template
+}
+
+func (t *template) Render(context Context, partials map[string]Template) (string, error) {
 	if partials == nil {
-		partials = make(map[string]*Template)
+		partials = make(map[string]Template)
 	}
 	var sb strings.Builder
-	for _, snippet := range t.Content {
+	for _, snippet := range t.content {
 		text, err := snippet.Render(context, partials)
 		if err != nil {
 			return "", err
@@ -54,13 +68,13 @@ func (t *Template) Render(context *Context, partials map[string]*Template) (stri
 	return sb.String(), nil
 }
 
-type Section struct {
-	Name    Key
-	Content *Template
+type section struct {
+	name    Key
+	content Template
 }
 
-func (s *Section) Render(context *Context, partials map[string]*Template) (string, error) {
-	data, ok := s.Name.Resolve(context)
+func (s *section) Render(context Context, partials map[string]Template) (string, error) {
+	data, ok := s.name.Resolve(context)
 	if !ok || data == nil {
 		return "", nil
 	}
@@ -69,11 +83,11 @@ func (s *Section) Render(context *Context, partials map[string]*Template) (strin
 		if !Truthy(data) {
 			return "", nil
 		}
-		return s.Content.Render(context.With(nil, data), partials)
+		return s.content.Render(context.With(nil, data), partials)
 	}
 	var sb strings.Builder
 	for index, data := range slice {
-		result, err := s.Content.Render(context.With(index, data), partials)
+		result, err := s.content.Render(context.With(index, data), partials)
 		if err != nil {
 			return "", err
 		}
@@ -82,25 +96,25 @@ func (s *Section) Render(context *Context, partials map[string]*Template) (strin
 	return sb.String(), nil
 }
 
-type Invert struct {
-	Name    Key
-	Content *Template
+type invert struct {
+	name    Key
+	content Template
 }
 
-func (s *Invert) Render(context *Context, partials map[string]*Template) (string, error) {
-	data, ok := s.Name.Resolve(context)
+func (s *invert) Render(context Context, partials map[string]Template) (string, error) {
+	data, ok := s.name.Resolve(context)
 	if ok && Truthy(data) {
 		return "", nil
 	}
-	return s.Content.Render(context, partials)
+	return s.content.Render(context, partials)
 }
 
-type Reference struct {
-	Name Key
+type reference struct {
+	name Key
 }
 
-func (r *Reference) Render(context *Context, partials map[string]*Template) (string, error) {
-	data, ok := r.Name.Resolve(context)
+func (r *reference) Render(context Context, partials map[string]Template) (string, error) {
+	data, ok := r.name.Resolve(context)
 	if !ok && !Truthy(data) {
 		return "", nil
 	}
@@ -111,20 +125,20 @@ func (r *Reference) Render(context *Context, partials map[string]*Template) (str
 	return fmt.Sprint(data), nil
 }
 
-type Plaintext struct {
-	Text string
+type plaintext struct {
+	text string
 }
 
-func (p *Plaintext) Render(context *Context, partials map[string]*Template) (string, error) {
-	return p.Text, nil
+func (p *plaintext) Render(context Context, partials map[string]Template) (string, error) {
+	return p.text, nil
 }
 
-type Include struct {
-	Name Key
+type include struct {
+	name Key
 }
 
-func (i *Include) Render(context *Context, partials map[string]*Template) (string, error) {
-	name := ResolveName(i.Name, context)
+func (i *include) Render(context Context, partials map[string]Template) (string, error) {
+	name := ResolveName(i.name, context)
 	partial, ok := partials[name]
 	if !ok {
 		return "", fmt.Errorf("no partial named %s", name)
@@ -132,16 +146,16 @@ func (i *Include) Render(context *Context, partials map[string]*Template) (strin
 	return partial.Render(context, partials)
 }
 
-type Partial struct {
-	Name    Key
-	Content *Template
+type partial struct {
+	name    Key
+	content Template
 }
 
-func (p *Partial) Render(context *Context, partials map[string]*Template) (string, error) {
-	name := ResolveName(p.Name, context)
+func (p *partial) Render(context Context, partials map[string]Template) (string, error) {
+	name := ResolveName(p.name, context)
 	if name == "" {
 		return "", fmt.Errorf("partial cannot be given empty name")
 	}
-	partials[name] = p.Content
+	partials[name] = p.content
 	return "", nil
 }

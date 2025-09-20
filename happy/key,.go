@@ -7,11 +7,11 @@ import (
 )
 
 type Key interface {
-	Resolve(context *Context) (any, bool)
+	Resolve(context Context) (any, bool)
 	String() string
 }
 
-func ResolveName(key Key, context *Context) string {
+func ResolveName(key Key, context Context) string {
 	data, ok := key.Resolve(context)
 	if !ok || data == nil {
 		return key.String()
@@ -53,7 +53,7 @@ type LiteralKey struct {
 	name string
 }
 
-func (lit LiteralKey) Resolve(context *Context) (any, bool) {
+func (lit LiteralKey) Resolve(context Context) (any, bool) {
 	return lit.name, true
 }
 
@@ -63,8 +63,8 @@ func (lit LiteralKey) String() string {
 
 type SelfKey struct{}
 
-func (SelfKey) Resolve(context *Context) (any, bool) {
-	return context.Data, true
+func (SelfKey) Resolve(context Context) (any, bool) {
+	return context.GetCurrent(), true
 }
 
 func (SelfKey) String() string {
@@ -73,8 +73,8 @@ func (SelfKey) String() string {
 
 type IndexKey struct{}
 
-func (IndexKey) Resolve(context *Context) (any, bool) {
-	return context.Index, true
+func (IndexKey) Resolve(context Context) (any, bool) {
+	return context.GetIndex(), true
 }
 
 func (IndexKey) String() string {
@@ -85,7 +85,7 @@ type DottedKey struct {
 	brackets []Key
 }
 
-func (dot DottedKey) Resolve(context *Context) (any, bool) {
+func (dot DottedKey) Resolve(context Context) (any, bool) {
 	for _, bracket := range dot.brackets {
 		data, ok := bracket.Resolve(context)
 		if !ok || data == nil {
@@ -93,7 +93,7 @@ func (dot DottedKey) Resolve(context *Context) (any, bool) {
 		}
 		context = context.With(nil, data)
 	}
-	return context.Data, true
+	return context.GetCurrent(), true
 }
 
 func (dot DottedKey) String() string {
@@ -105,21 +105,19 @@ type BracketKey struct {
 	args []Key
 }
 
-func (bkey BracketKey) Resolve(context *Context) (any, bool) {
-	for curr := context; curr != nil; curr = curr.Next {
-		data, ok := Get(curr.Data, bkey.name)
-		if ok {
-			args := make([]any, len(bkey.args))
-			for i, arg := range bkey.args {
-				args[i], ok = arg.Resolve(context)
-				if !ok || args[i] == nil {
-					args[i] = arg.String()
-				}
-			}
-			return Call(data, args)
+func (bkey BracketKey) Resolve(context Context) (any, bool) {
+	data, ok := context.GetData(bkey.name)
+	if !ok {
+		return nil, false
+	}
+	args := make([]any, len(bkey.args))
+	for i, arg := range bkey.args {
+		args[i], ok = arg.Resolve(context)
+		if !ok || args[i] == nil {
+			args[i] = arg.String()
 		}
 	}
-	return nil, false
+	return Call(data, args)
 }
 
 func (bkey BracketKey) String() string {

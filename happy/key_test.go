@@ -25,6 +25,7 @@ func TestKeyResolve(t *testing.T) {
 			return key.(happy.Key).Resolve(context)
 		}
 	}
+	when.YouDoOk("Plain key uses context", resolve(`name`, `[{"name":"Bob"}]`)).ExpectMatch(t, MatchJson(`"Bob"`))
 	when.YouDoOk("String key", resolve(`"name"`, `[]`)).ExpectMatch(t, MatchJson(`"name"`))
 	when.YouDoOk("String key ignores context", resolve(`"name"`, `[{"name":"Bob"}]`)).ExpectMatch(t, MatchJson(`"name"`))
 	when.YouDoOk("Plain key uses context", resolve(`name`, `[{"name":"Bob"}]`)).ExpectMatch(t, MatchJson(`"Bob"`))

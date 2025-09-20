@@ -35,15 +35,15 @@ func TestCompileTags(t *testing.T) {
 		}
 	}
 	when.YouDoErr("Section", parseTag(`(^*name^)(^.^)(^/^)`)).
-		Expect(t, &happy.Section{happy.Bracket("name"), &happy.Template{[]happy.Renderer{&happy.Reference{happy.Dot()}}}})
+		Expect(t, happy.Section(happy.Bracket("name"), happy.Content([]happy.Template{happy.Reference(happy.Dot())})))
 	when.YouDoErr("Comment", parseTag(`(^# a comment^)`)).
 		Expect(t, nil)
 	when.YouDoErr("Value", parseTag(`(^name^)`)).
-		Expect(t, &happy.Reference{happy.Bracket("name")})
+		Expect(t, happy.Reference(happy.Bracket("name")))
 	when.YouDoErr("Value consumes ws", parseTag(`    ( ^name^ )      `)).
-		Expect(t, &happy.Reference{happy.Bracket("name")})
+		Expect(t, happy.Reference(happy.Bracket("name")))
 	when.YouDoErr("Else", parseTag(`(^!name^)miss you!(^/^)`)).
-		Expect(t, &happy.Invert{happy.Bracket("name"), &happy.Template{[]happy.Renderer{&happy.Plaintext{"miss you!"}}}})
+		Expect(t, happy.Invert(happy.Bracket("name"), happy.Content([]happy.Template{happy.Plaintext("miss you!")})))
 	when.YouDoErr("Include", parseTag(`(^>name^)`)).
-		Expect(t, &happy.Include{happy.Bracket("name")})
+		Expect(t, happy.Include(happy.Bracket("name")))
 }

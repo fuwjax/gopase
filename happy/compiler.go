@@ -58,11 +58,11 @@ EOF = !.
 var ParserFrom = sync.OnceValue(func() parser.ParserFrom {
 	return parser.NewParserFrom(happyGrammar, happyHandler{})
 })
-var Parser = sync.OnceValue(func() parser.Parser[*Template] {
-	return parser.NewParser[*Template]("Template", happyGrammar, happyHandler{})
+var Parser = sync.OnceValue(func() parser.Parser[Template] {
+	return parser.NewParser[Template]("Template", happyGrammar, happyHandler{})
 })
 
-func Compile(template string) (*Template, error) {
+func Compile(template string) (Template, error) {
 	return Parser()(template)
 }
 
@@ -70,20 +70,20 @@ type happyHandler struct{}
 
 func (h happyHandler) Template(results iter.Seq2[string, any]) (any, error) {
 	_, value := funki.FirstOf(results, "Content")
-	return value.(*Template), nil
+	return value.(Template), nil
 }
 
 func (h happyHandler) Content(results iter.Seq2[string, any]) (any, error) {
-	result := make([]Renderer, 0)
+	result := make([]Template, 0)
 	for name, snippet := range results {
 		switch name {
 		case "Plain":
-			result = append(result, &Plaintext{snippet.(string)})
+			result = append(result, Plaintext(snippet.(string)))
 		case "Tag":
-			result = append(result, snippet.(Renderer))
+			result = append(result, snippet.(Template))
 		}
 	}
-	return &Template{result}, nil
+	return Content(result), nil
 }
 
 func (h happyHandler) Tag(results iter.Seq2[string, any]) (any, error) {
@@ -93,41 +93,41 @@ func (h happyHandler) Tag(results iter.Seq2[string, any]) (any, error) {
 
 func (h happyHandler) Otherwise(results iter.Seq2[string, any]) (any, error) {
 	_, value := funki.FirstOf(results, "Text")
-	return &Plaintext{value.(string)}, nil
+	return Plaintext(value.(string)), nil
 }
 
 func (h happyHandler) Value(results iter.Seq2[string, any]) (any, error) {
 	_, value := funki.FirstOf(results, "Key")
-	return &Reference{value.(Key)}, nil
+	return Reference(value.(Key)), nil
 }
 
 func (h happyHandler) Include(results iter.Seq2[string, any]) (any, error) {
 	_, value := funki.FirstOf(results, "KeyName")
-	return &Include{value.(Key)}, nil
+	return Include(value.(Key)), nil
 }
 
 func (h happyHandler) Section(results iter.Seq2[string, any]) (any, error) {
 	_, value := funki.FirstOf(results, "Key")
 	_, content := funki.FirstOf(results, "Content")
-	return &Section{value.(Key), content.(*Template)}, nil
+	return Section(value.(Key), content.(Template)), nil
 }
 
 func (h happyHandler) Else(results iter.Seq2[string, any]) (any, error) {
 	_, value := funki.FirstOf(results, "Key")
 	_, content := funki.FirstOf(results, "Content")
-	return &Invert{value.(Key), content.(*Template)}, nil
+	return Invert(value.(Key), content.(Template)), nil
 }
 
 func (h happyHandler) Partial(results iter.Seq2[string, any]) (any, error) {
 	_, value := funki.FirstOf(results, "KeyName")
 	_, content := funki.FirstOf(results, "Content")
-	return &Partial{value.(Key), content.(*Template)}, nil
+	return Partial(value.(Key), content.(Template)), nil
 }
 
 func (h happyHandler) Override(results iter.Seq2[string, any]) (any, error) {
 	//	_, value := parser.FirstOf(results, "KeyName")
 	//	_, content := parser.FirstOf(results, "Content")
-	//	return &Override{value.(Key), content.(*Template)}, nil
+	//	return &Override{value.(Key), content.(Template)}, nil
 	return nil, fmt.Errorf("not implemented")
 }
 
