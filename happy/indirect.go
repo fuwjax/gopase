@@ -100,6 +100,9 @@ func Get(data any, key string) (any, bool) {
 	return devalue(getIndirect(reflect.ValueOf(data), key))
 }
 
+/*
+Returns true if data isn't zero or the container isn't empty. Structs are always true.
+*/
 func Truthy(data any) bool {
 	if data == nil {
 		return false
@@ -213,7 +216,10 @@ func iterDirect(data any) (iter.Seq2[any, any], bool) {
 	return nil, false
 }
 
-func Iter(data any) (iter.Seq2[any, any], bool) {
+/*
+Returns a Seq2 iterator over the data. Ok will be false if the data does not act like a container.
+*/
+func Iter(data any) (i iter.Seq2[any, any], ok bool) {
 	iter, ok := iterDirect(data)
 	if ok {
 		return iter, ok
@@ -256,6 +262,10 @@ func iterIndirect(value reflect.Value) (iter.Seq2[any, any], bool) {
 	}
 }
 
+// currently in the most naive way possible.
+/*
+Converts any data to a string representation.
+*/
 func String(data any) (string, bool) {
 	switch d := data.(type) {
 	case nil:

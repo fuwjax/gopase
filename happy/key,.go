@@ -6,6 +6,8 @@ import (
 	"github.com/fuwjax/gopase/funki"
 )
 
+// Key and the following functions are public for testing. These are not intended for use outside the package.
+
 type Key interface {
 	Resolve(context Context) (any, bool)
 	String() string
@@ -24,68 +26,68 @@ func ResolveName(key Key, context Context) string {
 }
 
 func Dot() Key {
-	return SelfKey{}
+	return &selfKey{}
 }
 
 func At() Key {
-	return IndexKey{}
+	return &indexKey{}
 }
 
 func Lit(name string) Key {
-	return LiteralKey{name}
+	return &literalKey{name}
 }
 
 func Dotted(keys ...Key) Key {
 	if len(keys) == 1 {
 		return keys[0]
 	}
-	return DottedKey{keys}
+	return &dottedKey{keys}
 }
 
 func Bracket(name string, keys ...Key) Key {
 	if len(keys) == 0 {
 		keys = nil
 	}
-	return BracketKey{name, keys}
+	return &bracketKey{name, keys}
 }
 
-type LiteralKey struct {
+type literalKey struct {
 	name string
 }
 
-func (lit LiteralKey) Resolve(context Context) (any, bool) {
+func (lit *literalKey) Resolve(context Context) (any, bool) {
 	return lit.name, true
 }
 
-func (lit LiteralKey) String() string {
+func (lit *literalKey) String() string {
 	return lit.name
 }
 
-type SelfKey struct{}
+type selfKey struct{}
 
-func (SelfKey) Resolve(context Context) (any, bool) {
-	return context.GetCurrent(), true
+func (*selfKey) Resolve(context Context) (any, bool) {
+	return context.GetData(), true
 }
 
-func (SelfKey) String() string {
+func (*selfKey) String() string {
 	return "."
 }
 
-type IndexKey struct{}
+type indexKey struct{}
 
-func (IndexKey) Resolve(context Context) (any, bool) {
+func (*indexKey) Resolve(context Context) (any, bool) {
 	return context.GetIndex(), true
 }
 
-func (IndexKey) String() string {
+func (*indexKey) String() string {
 	return "@"
 }
 
-type DottedKey struct {
+type dottedKey struct {
 	brackets []Key
 }
 
-func (dot DottedKey) Resolve(context Context) (any, bool) {
+func (dot *dottedKey) Resolve(context Context) (any, bool) {
 	for _, bracket := range dot.brackets {
 		data, ok := bracket.Resolve(context)
 		if !ok || data == nil {
@@ -93,20 +95,20 @@ func (dot DottedKey) Resolve(context Context) (any, bool) {
 		}
 		context = context.With(nil, data)
 	}
-	return context.GetCurrent(), true
+	return context.GetData(), true
 }
 
-func (dot DottedKey) String() string {
+func (dot *dottedKey) String() string {
 	return strings.Join(funki.Apply(dot.brackets, Key.String), ".")
 }
 
-type BracketKey struct {
+type bracketKey struct {
 	name string
 	args []Key
 }
 
-func (bkey BracketKey) Resolve(context Context) (any, bool) {
-	data, ok := context.GetData(bkey.name)
+func (bkey *bracketKey) Resolve(context Context) (any, bool) {
+	data, ok := context.Get(bkey.name)
 	if !ok {
 		return nil, false
 	}
@@ -120,6 +122,6 @@ func (bkey BracketKey) Resolve(context Context) (any, bool) {
 	return Call(data, args)
 }
 
-func (bkey BracketKey) String() string {
+func (bkey *bracketKey) String() string {
 	return bkey.name + strings.Join(funki.Apply(bkey.args, func(k Key) string { return "[" + k.String() + "]" }), "")
 }

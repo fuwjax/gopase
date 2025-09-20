@@ -42,28 +42,16 @@ WS = [ \t\r\n]*
 EOF = !.
 `
 
-const overrideGrammar = `
-Override = (WS Entry WS)* EOF
-Entry = Open Name Close Content Open '/' Text Close
-Content = (Plain Entry)* Plain
-Open = '[^' / WS '[ ^'
-Close = '^]' / '^ ]' WS
-Plain = (!Open .)*
-Name = Ident ('.' Ident)*
-Ident = [_a-zA-Z0-9]+
-WS = [ \t\r\n]*
-EOF = !.
-`
-
+// ParserFrom exists exclusively for testing rules directly
 var ParserFrom = sync.OnceValue(func() parser.ParserFrom {
 	return parser.NewParserFrom(happyGrammar, happyHandler{})
 })
-var Parser = sync.OnceValue(func() parser.Parser[Template] {
+var templateParser = sync.OnceValue(func() parser.Parser[Template] {
 	return parser.NewParser[Template]("Template", happyGrammar, happyHandler{})
 })
 
 func Compile(template string) (Template, error) {
-	return Parser()(template)
+	return templateParser()(template)
 }
 
 type happyHandler struct{}

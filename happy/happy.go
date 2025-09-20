@@ -1,7 +1,26 @@
+/*
+Happy is templating for the soul. It's intended to be visually pleasing with tags that
+look like little emoji faces, and designed to be as simple as possible while still
+retaining the power required for meaningful general purpose templating use cases.
+
+The main way of interacting with happy is via Render
+
+	output, err := happy.Render(aTemplateString, someData, anyPartials)
+
+This will parse the aTemplateString into a happy.Template, convert someData into a happy.Context and pass this context and anyParials
+to template.Render. Which makes the Render function equivalent to.
+
+	template, err := happy.Compile(aTemplateString)
+	if err == nil {
+		context := happy.ContextOf(data)
+		output, err := template.Render(context, anyPartials)
+	}
+*/
 package happy
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 )
 
@@ -17,9 +36,14 @@ func Render(template string, data any, partials map[string]Template) (string, er
 	return comp.Render(ContextOf(data), partials)
 }
 
+/*
+Represents a pattern for applying the context to produce some output.
+*/
 type Template interface {
 	Render(context Context, partials map[string]Template) (string, error)
 }
+
+// The following are constructors made public for testing.
 
 func Content(content []Template) Template {
 	return &template{content}
@@ -56,6 +80,8 @@ type template struct {
 func (t *template) Render(context Context, partials map[string]Template) (string, error) {
 	if partials == nil {
 		partials = make(map[string]Template)
+	} else {
+		partials = maps.Clone(partials)
 	}
 	var sb strings.Builder
 	for _, snippet := range t.content {
