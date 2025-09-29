@@ -201,6 +201,10 @@ type ParseResult struct {
 	next  *ParseResult
 }
 
+func NewResult(name string, value any) *ParseResult {
+	return &ParseResult{name, value, nil}
+}
+
 /*
 Iterator over name-value pairs.
 */
@@ -313,14 +317,7 @@ func NewRule(name string, expr Expr) *Rule {
 Parses the input and returns a converted output object.
 */
 func (r *Rule) Parse(context *ParseContext) (any, error) {
-	var mark *ParsePosition
-	if context == nil || r == nil {
-		return nil, fmt.Errorf("WTF")
-	}
 	converter := context.handler(r.name)
-	if converter == nil { // just to avoid the reference count
-		mark = context.Mark()
-	}
 	result, err := r.expr.Parse(context)
 	if err != nil {
 		return nil, fmt.Errorf("%s\nwhile in %s", err, r.name)
@@ -328,7 +325,11 @@ func (r *Rule) Parse(context *ParseContext) (any, error) {
 	if converter != nil {
 		return converter(result.Results())
 	}
-	return context.Substring(mark), nil
+	var sb strings.Builder
+	for _, value := range result.Results() {
+		sb.WriteString(fmt.Sprint(value))
+	}
+	return sb.String(), nil
 }
 
 func (r *Rule) String() string {

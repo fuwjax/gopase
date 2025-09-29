@@ -168,11 +168,12 @@ func Cls(pattern string) Expr {
 }
 
 func (x *CharClass) Parse(context *ParseContext) (*ParseResult, error) {
-	if !x.regex.MatchString(context.Token()) {
+	token := context.Token()
+	if !x.regex.MatchString(token) {
 		return nil, context.Error(x.regex.String())
 	}
 	err := context.Next()
-	return nil, err
+	return NewResult("", token), err
 }
 
 func (x *CharClass) String() string {
@@ -197,7 +198,7 @@ func (x *Literal) Parse(context *ParseContext) (*ParseResult, error) {
 			return nil, err
 		}
 	}
-	return nil, nil
+	return NewResult("", x.literal), nil
 }
 
 func (x *Literal) String() string {
@@ -211,8 +212,9 @@ func Dot() Expr {
 }
 
 func (x *Any) Parse(context *ParseContext) (*ParseResult, error) {
+	token := context.Token()
 	err := context.Next()
-	return nil, err
+	return NewResult("", token), err
 }
 
 func (x *Any) String() string {
@@ -250,7 +252,7 @@ func (x *Reference) Parse(context *ParseContext) (*ParseResult, error) {
 			return nil, err
 		}
 	}
-	return &ParseResult{x.name, result, nil}, nil
+	return NewResult(x.name, result), nil
 }
 
 func (x *Reference) String() string {
