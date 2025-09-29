@@ -4,6 +4,7 @@ Package parser handles the general parsing abstractions for gopase.
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 	"reflect"
@@ -13,12 +14,25 @@ import (
 	"github.com/fuwjax/gopase/funki"
 )
 
+type ruleStack struct {
+	name string
+	next *ruleStack
+}
+
 /*
 parseCache is a simple named tuple for partial packrat functionality.
 */
 type parseCache struct {
-	value any
-	end   *ParsePosition
+	value      any
+	err        error
+	end        *ParsePosition
+	pending    bool
+	lrDetected bool
+	paths      []string
+}
+
+func newCache() *parseCache {
+	return &parseCache{nil, errors.New("left recursion detected"), nil, true, false, ([]string)(nil)}
 }
 
 /*
@@ -28,6 +42,7 @@ this type.
 type ParsePosition struct {
 	grapheme *Grapheme
 	cache    map[string]*parseCache
+	stack    *ruleStack
 	next     *ParsePosition
 }
 
@@ -39,31 +54,52 @@ Creates the initial ParsePostion. Further Positions should be created from
 advance().
 */
 func newParsePosition(input string) *ParsePosition {
-	return &ParsePosition{NewGrapheme(input), nil, nil}
+	return &ParsePosition{NewGrapheme(input), make(map[string]*parseCache), nil, nil}
 }
 
 /*
-Gets a cached result & end mark for a given ref name, if one exists.
+Gets a cached result & end mark for a given ref name, if one exists. Return indicates a cache hit.
 */
-func (p *ParsePosition) get(name string) (result any, end *ParsePosition, exists bool) {
-	if p.cache == nil {
-		return nil, nil, false
-	}
+func (p *ParsePosition) get(name string) (result any, err error, end *ParsePosition, exists bool) {
 	cached, exists := p.cache[name]
 	if !exists {
-		return nil, nil, false
+		p.stack = &ruleStack{name, p.stack}
+		cached = newCache()
+		p.cache[name] = cached
+	} else if cached.pending {
+		cached.lrDetected = true
+		for c := p.stack; c.name != name; c = c.next {
+			cached.paths = append(cached.paths, c.name)
+		}
 	}
-	return cached.value, cached.end, exists
+	return cached.value, cached.err, cached.end, exists
 }
 
 /*
-Caches a result and end mark for a given ref name.
+Caches a result and end mark for a given ref name. Returns true if ref should recurse.
 */
-func (p *ParsePosition) put(name string, result any, end *ParsePosition) {
-	if p.cache == nil {
-		p.cache = make(map[string]*parseCache)
+func (p *ParsePosition) put(name string, result any, err error, end *ParsePosition) (any, error, bool) {
+	cached := p.cache[name]
+	first := cached.end == nil
+	failed := err != nil
+	advanced := first || (!failed && cached.end.grapheme.Pos < end.grapheme.Pos)
+	detected := advanced && cached.lrDetected
+	if advanced {
+		cached.value = result
+		cached.err = err
+		cached.end = end
 	}
-	p.cache[name] = &parseCache{result, end}
+	if detected {
+		for _, n := range cached.paths {
+			delete(p.cache, n)
+		}
+		cached.paths = ([]string)(nil)
+		cached.lrDetected = false
+	} else {
+		p.stack = p.stack.next
+		cached.pending = false
+	}
+	return cached.value, cached.err, cached.pending
 }
 
 /*
@@ -74,7 +110,7 @@ func (p *ParsePosition) advance() (*ParsePosition, error) {
 		if p.grapheme.IsEof() {
 			return nil, p.grapheme.Error("anything")
 		}
-		p.next = &ParsePosition{p.grapheme.Next(), nil, nil}
+		p.next = &ParsePosition{p.grapheme.Next(), make(map[string]*parseCache), nil, nil}
 	}
 	return p.next, nil
 }
@@ -409,5 +445,10 @@ func BootstrapParserFrom(grammar *Grammar, handler Handler) ParserFrom {
 Parses the input according to the root, grammar, and handler.
 */
 func Parse(root string, grammar *Grammar, handler Handler, input string) (any, error) {
-	return grammar.Rule(root).Parse(newParseContext(input, grammar, handler))
+	ref := Ref(root)
+	result, err := ref.Parse(newParseContext(input, grammar, handler))
+	if err != nil {
+		return nil, err
+	}
+	return result.value, nil
 }

@@ -229,21 +229,26 @@ func Ref(name string) Expr {
 
 func (x *Reference) Parse(context *ParseContext) (*ParseResult, error) {
 	mark := context.Mark()
-	var result any
-	var err error
-	result, end, ok := mark.get(x.name)
-	if ok {
+	result, err, end, cacheHit := mark.get(x.name)
+	if cacheHit {
+		if err != nil {
+			return nil, err
+		}
 		context.Reset(end)
 	} else {
 		rule := context.grammar.Rule(x.name)
 		if rule == nil {
 			return nil, fmt.Errorf("no such rule: %s", x.name)
 		}
-		result, err = rule.Parse(context)
+		recurse := true
+		for recurse {
+			context.Reset(mark)
+			result, err = rule.Parse(context)
+			result, err, recurse = mark.put(x.name, result, err, context.Mark())
+		}
 		if err != nil {
 			return nil, err
 		}
-		mark.put(x.name, result, context.Mark())
 	}
 	return &ParseResult{x.name, result, nil}, nil
 }

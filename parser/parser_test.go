@@ -61,3 +61,33 @@ func TestParserHandlerArray(t *testing.T) {
 		when.YouErr(parser("abab")).Expect(t, []any{"ab", "ab"})
 	})
 }
+func TestParserRightRecursion(t *testing.T) {
+	t.Run("Parser Right Recursion", func(t *testing.T) {
+		grammar := parser.NewGrammar().AddRule("S", parser.Alt(parser.Seq(parser.Lit("a"), parser.Ref("S")), parser.Lit("a")))
+		parser := parser.BootstrapParser[any]("S", grammar, parser.WrapHandler(nil))
+		when.YouErr(parser("a")).Expect(t, "a")
+		when.YouErr(parser("aaa")).Expect(t, "aaa")
+		when.YouErr(parser("aab")).Expect(t, "aa")
+	})
+}
+
+func TestParserLeftRecursion(t *testing.T) {
+	t.Run("Parser Left Recursion", func(t *testing.T) {
+		grammar := parser.NewGrammar().AddRule("S", parser.Alt(parser.Seq(parser.Ref("S"), parser.Lit("a")), parser.Lit("a")))
+		parser := parser.BootstrapParser[any]("S", grammar, parser.WrapHandler(nil))
+		when.YouErr(parser("a")).Expect(t, "a")
+		when.YouErr(parser("aaa")).Expect(t, "aaa")
+		when.YouErr(parser("aab")).Expect(t, "aa")
+	})
+}
+
+func TestParserIndirectLeftRecursion(t *testing.T) {
+	t.Run("Parser Left Recursion", func(t *testing.T) {
+		grammar := parser.NewGrammar().AddRule("S", parser.Alt(parser.Seq(parser.Ref("T"), parser.Lit("b")), parser.Lit("a")))
+		grammar.AddRule("T", parser.Alt(parser.Seq(parser.Ref("S"), parser.Lit("a")), parser.Lit("c")))
+		parser := parser.BootstrapParser[any]("S", grammar, parser.WrapHandler(nil))
+		when.YouErr(parser("a")).Expect(t, "a")
+		when.YouErr(parser("aaba")).Expect(t, "aab")
+		when.YouErr(parser("aabab")).Expect(t, "aabab")
+	})
+}
