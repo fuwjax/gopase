@@ -46,6 +46,8 @@ The normal process is to hand the engine the set of grammar, root, and handler o
 5) Chesur. I created a language many moons ago that made it super easy to write parsers/serializers with a PEG mindset without the silliness of EBNF. I look forward to revisiting it.
 6) TBD parser. My gut says this will be a predictive recursive descent parser. Time will tell.
 
+Note from my future self: ah, silly past self. The whole point of making a parser is that you'll be able to do fantastic things you didn't think about doing at the time. The template engine and simple code template led to an interesting idea. A parser takes text and turns it into an AST. A template engine renders text given a set of instructions that help it walk an object graph, i.e. it takes an object and turns it into text. Imagine you had a function that turned that AST into the object you wanted to hand off to the rendering engine. So a function f that meant you could have T(F(P(input text))) where T is the template function, F is the transformation function, and P is the parsing function. So... 3.1) Pure functional transformation language, coming right up.
+
 ### How do we use this PEG parser
 
 Hand Peg() a string that follows the EBNF-ish extensions to basic PEG grammar given below, and it'll return you a Grammar that conforms to that specification. Then from that Grammar, call Parser() with a root and a handler and you'll have a Parser of your very own.
@@ -295,3 +297,205 @@ instance execution times, will actually be tracking the time for the operation, 
 
 Anyway, if it proves (potentially) useful to folks, I'll document it further. But it was a pleasant diversion before trying to tackle the next thing on my list, which, just
 for the record, is no longer an Earley parser. I have a more ridiculous direction in mind.
+
+### Funki - Functional programming for the rest of us. (And the ridiculousness has arrived)
+
+I love functional programming. Well, I love the idea of it. I was a math major, so maybe that accounts for a bit of it. But if you've ever tried to pick up Haskell or Lisp, you probably promptly put it right back down. The concepts definitely take some getting used to, and they're clever as all get out, but it genuinely takes me way too long to grok even simple functions. Reading functional code takes me back to rationalizing disassembler output. It just takes a long time to read something you didn't write.
+
+But that's not what functions are in math. They are exist to capture cryptic ideas in clear ways, not the other way around. The beauty isn't that you can write as few symbols as possible, or obfuscate every single intention. The beauty is the idea expressed, not the mental gymnastics it takes to grok the expression.
+
+Before we get into the functions themselves, let's talk data types. There are really just 3, although it will look like 5. Scalars are just representations for numbers.
+
+	1     # the number 1
+	1.1   # 10% more than the number 1
+	-1    # the number 1, but the "other" direction
+	1e1	  # 10 for those folks who like obfuscation for the sake of it
+	010   # 8 for those folks who hate thumbs
+	0xF	  # 15 for those folks with 16 fingers
+    true  # also just the number 1, most of the time
+	false # zero, definitely always
+	nil   # also zero, sort of
+	nan   # the number which is not a number
+	inf	  # the number which is greater than all other numbers
+
+Tuples are going to show up much more in funki than in other languages. You can think of them as fixed length arrays, but the elements don't have to be the same type.
+
+	(1, 2, 3)  # a three element tuple
+	(1)        # a one element tuple
+    ()         # a no element tuple
+	nil        # the same as (), sort of
+
+Next we have Lists. They may look like arrays, strings, and objects but it's better to think of them as linked lists. Like tuples, elements don't have to be the same type.
+
+	[1,2,3]               # under the covers this is really 3 nodes in a linked list
+	[]                    # the empty list
+	"abc"                 # this is the same as ["a", "b", "c"]    
+    ""                    # the empty list
+	{key: 1, bob: "hope"} # this is the same as [("key", 1), ("bob", "hope")]
+    {}                    # the empty list
+	nil                   # would you believe it's just [], "", or {}, kinda sorta?
+
+This is why I said it's really 3, but looks like 5. Strings and objects come up so frequently that it's nice to have a convenient way of expressing them, even if it's hiding a bit of complexity in the implementation.
+
+Ok, time for functions. Declaring a function is just naming a relation. A relation is just a mapping from a pattern to a production. That sounds more confusing than it is, let's look at an example
+
+	f(x) -> 2 * x
+
+here we see the name "f" given to the relation "(x) -> 2 * x". You might get the impression that a relation is just what some languages call a lambda expression, and that's close to true, but we'll see that's not exactly right soon. Here we have a pattern "(x)" and a production "2 * x". That pattern says we're expecting a tuple with a single element. so things like (1) or ("bob") would match, but () and (0, 0) would not. When the pattern matches, the corresponding elements are mapped to the given variables to be used in the production. so f(1) would map the 1 to x for use on the production side of the declaration, which would be 2*1 or just 2. Productions usually evaluate more functions, in this case, the * function is defined by the language to be multiplication of scalars.
+
+I realize that was just a long winded way of saying functions are just how functions work. But they're a little bit more confusing than that. A pattern doesn't have to be a tuple. It does however have to be a single thing. Every function, always, always, always, takes exactly one argument, even if it doesn't "look" like it.
+
+	f x -> 2 * x
+	g(y) -> f y
+	h a b -> a + b  #ERROR! this won't even parse as a function declaration
+	q {age: years} -> years + 1
+
+That last one is a bit intimidating. The pattern doesn't have to be a tuple. Here we are saying that q's argument is going to be one of those lists of tuple pairs where the first element in the tuple is a string. If we think of those pairs as the properties of an object, then this pattern is expecting a property named "age" and whatever the second element of that age property tuple is will be mapped to "years" for the production. So this q function must be something related to birthdays maybe.
+
+What happens if q is called and there is no age tuple in the list, or the argument to q isn't a list of tuple pairs, or maybe it's not even a list at all. What happens if we try to do q(1)? Short answer, it will fail. The number 1 doesn't match the pattern, so trying to apply the relation named q to it is going to have undefined behavior. "Undefined" here means Kermit-style run around screaming. 
+
+So... what can we do then? In math we would call these things piecewise functions, where we want to specify the behavior individually for different subsets of the inputs. But funki just calls them tests
+
+	q x -> test x
+		{age: years} -> years + 1
+		_ -> 0
+
+The keyword test tells funki to try each successive relation until one matches. That underscore is a wildcard; it'll match anything for x. So if x is an object-like list with an age property-tuple, then return the value side, or second element, plus one. If x doesn't match that age property pattern, then it'll definitely match the second pattern and return zero.
+
+Ok, but if that object-like notation is just syntactic sugar, how would this work for lists? Remember, it's best to think of them as linked lists, so we really want to be able the say that we want the first node in the chain. Enter the pop operator, or pop-op.
+
+	p [x:xs] -> len(x) + p xs
+
+That colon separating x and xs says to take the first element from the list and map that to x, and the rest of the list (think of it as the "next" pointer) gets mapped to xs. Here we seem to be adding up the len's of all the elements of the argument list. It should also be noted that a tuple of one thing is the exact same thing as the one thing by itself, so for example
+
+	p([x:xs]) -> len(x) + p(xs)
+
+This function definition is the exact same as the previous declaration. It is recommended to use parentheses whenever it helps clarify the intention of the function, which is likely the vast majority of the time. No one is going to give you a cookie for saving those shift-9 and shift-0 keypresses.
+
+So, we see how to get information out of a list. What if we want to return a list?
+
+	p([x:xs]) -> len(x):p(xs)
+
+Just like we had the colon to indicate pop on the pattern side of the relation, here we use the colon to indicate push on the production side. This says to evaluate the len of x, and then push that value in the front of whatever p of the rest of the xs returns. Hold on a second, what happens with an empty list? Don't we need to specify it?
+
+Great observation, but no, not usually. Remember how nil was really vaguely defined? As a pattern, nil matches 0, (), and []. As a production, it's 0, (), or [] depending on what's needed when it's resolved. And every function gets an implicit test x ... nil -> nil added to the end of it. So if that's the behavior you want, and usually it is, then you don't have to specify anything. But let's say you had something more elaborate, then just use test
+
+	elaborate(list) -> test list
+		[x:xs] -> 2 * x + elaborate(xs)
+		[] -> 3
+
+Could someone do something silly like "elaborate()"? Yep, and that will return nil. In general functions with literal empty arguments are pretty rare, since they's just constants and we have better ways of expressing those. So "elaborate()" will generate a warning. But yeah, it's still a possibility. If you really want to prevent it, then you can do something like.
+
+	supersafe(x) -> test x
+		... # some relations
+		nil -> panic("at the disco")
+
+But that just feels really overkill. Panic, as you might imagine, is not a pure functional function. Turns out, I don't much care if you call things with side effects. I'm just not going to give you any way of defining side effects in your function, or managing them in any meaningful way. I'm also going to cache results, so if you're expecting side effects to influence evaluation, you're probably going to be very disappointed.
+
+Now might be a great time to get some of the disappointment out of the way. If you're into functional languages, you might be pretty unhappy at this point. There's no type system in funki. That means all those errors that type systems insulate you from are back in full force. It's ok, folks write javascript all day long. Is it a mess? Sure, but it also powers the client side of the internet, so we apparently make do. And we might as well get currying out of the way. If you don't know what that is, you're in luck. Funki doesn't do currying. You do.
+
+	f(x, y) -> ...         # do something with x and y
+	g(x) -> (y) -> f(x, y) # calling g will return a relation that can be called 
+
+In this example, the production side of f isn't important, it just matters that f takes a tuple of size 2. Currying means we want to create a new function that returns a function that "finishes" a call to f. Normally functional languages implicitly create that g for you (well, not exactly true, but the end result feels that way). Funki doesn't implicitly create phantom functions for you. But you can still make them if you want them, you just have to be explicit. If we can produce a relation, there needs to be a pattern to match it, right? Correctamundo
+
+	h(z _->_, x) -> z(2 * x) / 2 
+
+Here h is expecting a relation and something to pass to that relation. The underscores still mean you need a "something" to match, you're just not worried what that something is. If you wanted to produce something with h, you might use "h(g, 3)" with g being the explicit curry function we just declared a bit ago. Folks who are used to thinking with functions don't need all that extra information, but the rest of us don't have to even think. We see a single argument function declaration that produces a single argument relation. Can you take it to extremes?
+
+	f x -> y -> z -> a -> (x + y) * (z + a)
+
+Yup, but then all the rest of us just see a jerk. Could I even make it so that you could get rid of all those inner arrows and basically be able to write haskell-ese? Syntactically, maybe. Ethically... look, this is not a general purpose functional language. This is about transforming stuff you get from a parse into something useful. The principle "useful" is for handing off to a templating engine. If you want a general purpose language, there are tons out there. This is about solving a problem in a way that normal folks can read and write so that those normal folks can maintain it without having to force their brains into a sausage grinder every few months.
+
+Ok, back on task. Let's see all the options we have for the pattern side of a relation. Remember that every function takes exactly one argument, so every function declaration must declare exactly one parameter pattern.
+
+	f x -> ...            # If that parameter pattern is a name, then that's the name of the argument. It can be anything - scalar, tuple, list, or relation, 
+	f(x) -> ...           # Tuples make functions look like functions. Use them if you can.
+	f(_) -> ...           # This will match any one element tuple, but you won't be able to use that element.
+	f(x, y) -> ...         # One parameter pattern can give us multiple parameters.
+	f([xs]) -> ...         # This will only match a list, just remember objects and strings are lists too
+	f([x:xs]) -> ...      # This will pop an element off the list as x, and give you the rest of the list as xs
+	f([x:y:xs]) -> ...    # This pops two elements off the list. Note that this will only match if there are at least 2 elements in the list.
+	f(0) -> ...			   # This will only match the scalar 0.
+	f(false) -> ...			# This will only match the scalar 0.
+	f(true) -> ...			# This will match any scalar that isn't 0, nil, or nan
+	f("exact") -> ...     # This will only match the string "exact".
+	f({x}) -> ...           # This will match any object-looking lists.
+	f({key: value}) -> ... # This will match any object-looking lists with at least one tuple whose first element is "key" 
+	                       # and make the second element available to the production as value.
+	f(g _->_) -> ...       # Matches any relation.
+	f((x, y), z, "crazy") -> ... # This might mean you're starting to think like a functional programmer.
+
+So, to recap, a pattern is one of the following
+*) a name
+*) a literal scalar or string
+*) a list
+*) one or more pops off a list
+*) an object
+*) key-value pairs
+*) a relation to an underscore with arguments that are
+	*) an underscore
+	*) a tuple of underscores
+*) a tuple of patterns
+
+Just a note, do you have to use underscores for relation patterns? For now, yes. I think patterns matching patterns is a little too meta for what the language is trying to accomplish right now. Also, just for clarity, you'll get a warning if you use a name in the pattern but not in the production. If you don't want that warning, use an underscore instead of the name.
+
+Also, why is it "object-looking list" instead of just object? All the object stuff is just syntactic sugar. Let's look at it a little more in depth. That "{key: value}" pattern, how would we do that without the sugar?
+
+	valueOf(obj, key) -> test obj
+		[(k, v):o] -> test k = key
+			false -> valueOf(o, key)
+			true -> v
+
+This isn't exactly a replacement for the pattern, as it's a function and functions aren't patterns. But this is how you could get a value for a key from a list of tuples that's masquerading as an object. But if that's get, how do we set?
+
+	set(object, key, value) -> (key, value):object
+
+Um, ok, sure, but what's the sugar version? There isn't one. I've tried coming up with one, and anything I've come up with either implies that assignment is a thing, which it isn't, or it implies that you can index into a list, which you can't. Totally open to suggestions, but this is what set looks like for now. Ternary functions that masquerade as operators are tricky on the best of days, looking at you ?:.
+
+Ok, what about productions, what are those options?
+
+	... -> 123 						# scalars
+	... -> "happy"					# literal strings
+	... -> x						# valid names, either from the pattern(s) of the function that lead to this production, or a global name
+	... -> (a, b, c)					# literal tuples
+	... -> [1,2,3]					# literal lists
+	... -> {name: "bob", age: x}	# literal objects
+	... -> test production			# tests the result of the production against successive relations.
+		relation
+	... -> x:xs						# push ops
+	... -> x in xs					# containment
+	... -> object._					# first property
+	... -> object.prop				# first named property
+	... -> object.[]prop 			# property list
+	... -> "Ms. " ++ name 			# concatenation
+	... -> 0 = 1					# equality operators, also !=, <, >, <=, >=
+	... -> 0 + 1					# arithmetic operators, also -, *, /, %
+	... -> x & y					# bit/boolean operators, also |, ^, <<, >>
+	... -> -x						# prefix operators, also !
+	... -> len(pi)					# external functions and constants (these have to be explicitly registered with the interpreter, and are not reserved)
+
+So only 2 keywords, "test" and "in"? Oh, and the scalars "true", "false", "nil", "nan", and "inf". Well, almost. Remember way back when we were first discussing that functions always had to take exactly one argument, we said that there's a better way to define constants than using empty tuples?
+
+	const worldsGreatestBob <- "Ross"
+	bestBob(person) -> person.surname = worldsGreatestBob	
+
+Constants are defined in a way that makes them feel a bit like a function declaration, but that would imply that the constant's name is actually an argument which all gets quite confusing. That's why the arrow points the other way. It's just not a function declaration. It's a different thing, another way of contributing a name to the global namespace.
+
+I think there's just a few operations left to discuss. The "in" operator checks containment, like 1 in [1,2,3] or "cred" in "incredible". Concatenation gets its own operator so it's clear that 1 + 2 = 3 and "1" ++ "2" == "12". It also works for any other lists, like [2,3,5] ++ [8,13,21] or {name: "Hubert"} ++ {age: 104}. All the standard math operators show up.
+
+Those last three are more syntactic sugar for object-like lists. Remember, they're just linked lists, so there's nothing preventing the same key from showing up multiple times.
+
+	const guys <- {fullNames: false, name: "Tom", name: "Dick", name: "Harry"}
+	... -> guys._ 			# false, it returns the second element from the first named tuple.
+	... -> guys.name		# "Tom", it returns the second element from the first tuple whose first element is "name".
+	... -> guys.[]name		# ["Tom", "Dick", "Harry"], hopefully obvious why.
+
+These are all implementable within the existing language, but they're operations used so frequently in parsing that they felt like they needed to be part of the formal language.
+
+Ok, I think that's about it. Leave your questions/comments somewhere I can find them. Probably voicemail given the folks who will even know this exists.
+
+
+
+
+
