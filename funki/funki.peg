@@ -1,29 +1,49 @@
 Grammar = (Declaration / Comment / WS EOL)* WS EOF
 Declaration = Name WS Relation EOL
-Relation = Pattern WS "->" WS Expression
-Pattern = Param (WS Param)* / "(" WS Pattern WS ")".  #isn't this the deadly pattern?
-Param = Name / Underbar / ListParam / Literal / TupleParam # maybe one day ObjectParam?
-ListParam = "[" WS (Pattern (WS ":" WS Pattern)*)? WS "]"
-TupleParam = "(" WS (Pattern (WS "," WS Pattern)*)? WS ")"
-Expression = InfixExpr / TestExpr / ObjectExpr / ListExpr / TupleExpr / Call / Literal / "(" Expression ")"
-TestExpr = "test" WS Expression (EOL Indent Relation)+
-ListExpr = "[" WS (Expression (WS "," WS Expression)*)? WS "]"
-TupleExpr = "(" WS (Expression (WS "," WS Expression)*)? WS ")"
-ObjectExpr = "{" WS (KeyValue (WS "," WS KeyValue)*)? WS "}"
-KeyValue = Name WS ":" WS Expression
-InfixExpr = Dot / DotUnder / DotList / Concat / Push
-Dot = Expression WS "." WS Name
-DotUnder = Expression WS "._"
-DotList = Expression WS ".[]" Name
-Concat = Expression WS "++" WS Expression
-Push = Expression WS ":" WS Expression
-Call = Name Context?
-Context = Expression (WS Expression)*
+Relation = Pattern WS "->" WS Production / Pattern WS Relation
+
+Pattern = Number / Underbar / Name / Literal / ListPattern / TuplePattern / ObjectPattern / RelationPattern
+ListPattern = "[" WS (Pattern (WS ":" WS Pattern)*)? WS "]"
+TuplePattern = "(" WS (Pattern (WS "," WS Pattern)*)? WS ")"
+ObjectPattern = "{" WS EntryPattern (WS "," WS EntryPattern)* WS "}"
+EntryPattern = Name WS ":" WS Pattern
+RelationPattern = Name WS Pattern WS "->" WS "_"
+
+Production = "(" WS Production WS ") / Relation / TestProduction / Operation / Invocation / ObjectProduction / TupleProduction / ListProduction / Literal / Name / Number
+TestProduction = "test" WS Production (EOL Indent Relation)+
+Invocation = Name Production
+ObjectProduction = "{" WS (EntryProduction (WS "," WS EntryProduction)*)? WS "}"
+EntryProduction = Name WS ":" WS Production
+TupleProduction = "(" WS (Production (WS "," WS Production)*)? WS ")"
+ListProduction = "[" WS (Production (WS "," WS Production)*)? WS "]"
+
+MayResolveToObject = "(" WS MayResolveToObject WS ")" / ObjectOperation / Concatenate / Invocation / ObjectProduction / ListProduction / Name
+MayResolveToList = "(" WS MayResolveToList WS ")" / ObjectOperation / Concatenate / Invocation / ObjectProduction / ListProduction / Literal / Name
+MayResolveToNumber = "(" WS MayResolveToNumber WS ")" / Dot / DotUnder / Contains / Equality / Comparison / Calculation / PrefixOperation / Invocation / Name / Number
+
+Operation = ObjectOperation / Concatenate / Contains / Equality / Comparison / Calculation / PrefixOperation
+ObjectOperation = DotUnder / Dot / DotList
+Dot = MayResolveToObject WS "." WS Name
+DotUnder = MayResolveToObject WS "._"
+DotList = MayResolveToObject WS ".[]" Name
+Concatenate = MayResolveToList WS "++" WS MayResolveToList
+Contains = Production "in" MayResolveToList
+Equality = Production EqualityOperator Production
+EqualityOperator = "=" / "!="
+Comparison = MayResolveToNumber ComparisonOperator MayResolveToNumber
+ComparisonOperator = "<=" / ">=" / [<>]
+Calculation = MayResolveToNumber ArithmaticOperator MayResolveToNumber
+ArithmaticOperator = [+-*/%&|^]
+PrefixOperation = PrefixOperator MayResolveToNumber
+PrefixOperator = [!-]
 
 Literal = '"' (Escape / [^\\"])* '"'
-Escape = "\\" Escaped                   # support match processing or literal parse or something like that
-Escaped = [\\"nrt]
+Escape = "\\" [\\"nrt]
 Name = [a-zA-Z] [a-zA-Z0-9_]* / "_"+ [a-zA-Z0-9_]+
+Number = Hex / Octal / Decimal
+Hex = "0x" [0-9a-fA-F]+
+Octal = "0" [0-7]+
+Decimal = ("0" / [1-9][0-9]*) ("." [0-9]*)? ([eE] [+-]? [0-9]+)?
 Underbar = "_"
 Comment = "#" (!EOL .)* EOL
 Indent = [ \t]+
