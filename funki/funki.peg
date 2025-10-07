@@ -1,4 +1,4 @@
-Grammar = (Declaration / Comment / WS EOL)* WS EOF
+Library = (Declaration / Comment / WS EOL)* WS EOF
 Declaration = Name WS Relation EOL
 Relation = Pattern WS "->" WS Production / Pattern WS Relation
 
